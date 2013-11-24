@@ -1,0 +1,2 @@
+WebGL tutorial: http://learningwebgl.com/blog/
+JavaScript reference: http://www.javascripture.com
