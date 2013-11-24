@@ -3,7 +3,9 @@ var time = 0.0;
 var shader;
 var mvMatrix = mat4.create();
 var pMatrix = mat4.create();
+var normalMatrix = mat3.create();
 var vertexBuffer;
+var normalBuffer;
 var indexBuffer;
 
 function initGL(canvas) {
@@ -61,14 +63,18 @@ function initShaders() {
 		alert("Could not initialise shaders");
 	}
 	gl.useProgram(shader);
-	shader.vertexPositionAttribute = gl.getAttribLocation(shader, "vertexPosition");
-	gl.enableVertexAttribArray(shader.vertexPositionAttribute);
-	shader.pMatrixUniform = gl.getUniformLocation(shader, "pMatrix");
-	shader.mvMatrixUniform = gl.getUniformLocation(shader, "mvMatrix");
+	shader.vertexPosition = gl.getAttribLocation(shader, "vertexPosition");
+	gl.enableVertexAttribArray(shader.vertexPosition);
+	shader.vertexNormal = gl.getAttribLocation(shader, "vertexNormal");
+	gl.enableVertexAttribArray(shader.vertexNormal);
+	shader.pMatrix = gl.getUniformLocation(shader, "pMatrix");
+	shader.mvMatrix = gl.getUniformLocation(shader, "mvMatrix");
+	shader.nMatrix = gl.getUniformLocation(shader, "nMatrix");
 }
 function setMatrixUniforms() {
-	gl.uniformMatrix4fv(shader.pMatrixUniform, false, pMatrix);
-	gl.uniformMatrix4fv(shader.mvMatrixUniform, false, mvMatrix);
+	gl.uniformMatrix4fv(shader.pMatrix, false, pMatrix);
+	gl.uniformMatrix4fv(shader.mvMatrix, false, mvMatrix);
+	gl.uniformMatrix3fv(shader.nMatrix, false, normalMatrix);
 }
 
 function handleLoadModel(data) {
@@ -78,6 +84,7 @@ function handleLoadModel(data) {
 	var currentFace = 0;
 	var faceCount = 0;
 	var vertices = [];
+	var normals = [];
 	var faces = [];
 	var inHeader = true;
 	var match;
@@ -97,10 +104,13 @@ function handleLoadModel(data) {
 		}
 		if (!inHeader) {
 			var split = lines[i].replace(/^\s+/, "").split(/\s+/);
-			if (split.length >= 3 && currentVertex < vertexCount) {
+			if (split.length >= 6 && currentVertex < vertexCount) {
 				vertices.push(parseFloat(split[0]));
 				vertices.push(parseFloat(split[1]));
 				vertices.push(parseFloat(split[2]));
+				normals.push(parseFloat(split[3]));
+				normals.push(parseFloat(split[4]));
+				normals.push(parseFloat(split[5]));
 				currentVertex += 1;
 			}
 			if (split.length >= 4 && currentVertex >= vertexCount && currentFace < faceCount) {
@@ -112,11 +122,17 @@ function handleLoadModel(data) {
 			}
 		}
 	}
+	alert(vertexCount);
 	vertexBuffer = gl.createBuffer();
 	gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer);
 	gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.STATIC_DRAW);
 	vertexBuffer.itemSize = 3;
 	vertexBuffer.numItems = vertexCount;
+	normalBuffer = gl.createBuffer();
+	gl.bindBuffer(gl.ARRAY_BUFFER, normalBuffer);
+	gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(normals), gl.STATIC_DRAW);
+	normalBuffer.itemSize = 3;
+	normalBuffer.numItems = vertexCount;
 	indexBuffer = gl.createBuffer();
 	gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indexBuffer);
 	gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(faces), gl.STATIC_DRAW);
@@ -127,7 +143,7 @@ function handleLoadModel(data) {
 function loadModel() {
 	var request = new XMLHttpRequest();
 	request.overrideMimeType('text/plain');
-	request.open("GET", "teapot.ply");
+	request.open("GET", "teapot_withnormals.ply");
 	request.onreadystatechange = function() {
 		if (request.readyState == 4) {
 			handleLoadModel(request.responseText);
@@ -149,11 +165,17 @@ function draw() {
 	mat4.rotate(mvMatrix, 1.0, [-1.0, 0.0, 0.0]);
 	mat4.rotate(mvMatrix, time, [0.0, 0.0, 1.0]);
 
+	mat4.toInverseMat3(mvMatrix, normalMatrix);
+	mat3.transpose(normalMatrix);
+
 	gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer);
-	gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indexBuffer);
-	gl.vertexAttribPointer(shader.vertexPositionAttribute, vertexBuffer.itemSize, gl.FLOAT, false, 0, 0);
+	gl.vertexAttribPointer(shader.vertexPosition, 3, gl.FLOAT, false, 0, 0);
+	gl.bindBuffer(gl.ARRAY_BUFFER, normalBuffer);
+	gl.vertexAttribPointer(shader.vertexNormal, 3, gl.FLOAT, true, 0, 0);
+
 	setMatrixUniforms();
 
+	gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indexBuffer);
 	gl.drawElements(gl.TRIANGLES, indexBuffer.numItems, gl.UNSIGNED_SHORT, 0);
 
 }
@@ -171,7 +193,9 @@ function start() {
 	initGL(canvas);
 	initShaders();
 	loadModel();
-	gl.clearColor(0.0, 0.0, 0.0, 1.0);
+	gl.clearColor(1.0, 1.0, 1.0, 1.0);
 	gl.enable(gl.DEPTH_TEST);
+	//gl.enable(gl.CULL_FACE);
+	//gl.cullFace(gl.BACK);
 	tick();
 }

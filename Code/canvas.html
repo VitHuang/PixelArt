@@ -6,19 +6,29 @@
 <script id="shader-fs" type="x-shader/x-fragment">
 precision mediump float;
 
+varying vec3 lighting;
+
 void main(void) {
-	gl_FragColor = vec4(1.0, 1.0, 1.0, 1.0);
+	gl_FragColor = vec4(vec3(1.0, 1.0, 1.0) * lighting, 1.0);
 }
 </script>
 
 <script id="shader-vs" type="x-shader/x-vertex">
 attribute vec3 vertexPosition;
+attribute vec3 vertexNormal;
 
 uniform mat4 pMatrix;
 uniform mat4 mvMatrix;
+uniform mat3 nMatrix;
+
+varying vec3 lighting;
 
 void main(void) {
 	gl_Position = pMatrix * mvMatrix * vec4(vertexPosition, 1.0);
+	vec3 transformedNormal = nMatrix * vertexNormal;
+	float lightWeighting = max(transformedNormal.x, 0.0);
+	float lightWeighting2 = max(transformedNormal.y, 0.0);
+	lighting = vec3(0.7, 0.4, 0.0) * lightWeighting + vec3(0.5, 0.5, 0.5) * lightWeighting2 + vec3(0.5, 0.5, 0.5);
 }
 </script>
 
@@ -27,7 +37,7 @@ void main(void) {
 </head>
 
 <body onload="start()">
-	<canvas id="glcanvas" width="800" height="640">
+	<canvas id="glcanvas" width="1000" height="800">
 		Your browser doesn't support HTML5 Canvas.
 	</canvas>
 </body>
