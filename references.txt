@@ -1,2 +1,3 @@
 WebGL tutorial: http://learningwebgl.com/blog/
 JavaScript reference: http://www.javascripture.com
+Model downloads: http://graphics.cs.williams.edu/data/meshes.xml

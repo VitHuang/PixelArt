@@ -4,22 +4,22 @@
 <script type="text/javascript" src="webgl-utils.js"></script>
 
 <script id="shader-fs" type="x-shader/x-fragment">
-	precision mediump float;
+precision mediump float;
 
-	void main(void) {
-		gl_FragColor = vec4(1.0, 1.0, 1.0, 1.0);
-	}
+void main(void) {
+	gl_FragColor = vec4(1.0, 1.0, 1.0, 1.0);
+}
 </script>
 
 <script id="shader-vs" type="x-shader/x-vertex">
-	attribute vec3 vertexPosition;
+attribute vec3 vertexPosition;
 
-	uniform mat4 pMatrix;
-	uniform mat4 mvMatrix;
+uniform mat4 pMatrix;
+uniform mat4 mvMatrix;
 
-	void main(void) {
-		gl_Position = pMatrix * mvMatrix * vec4(vertexPosition, 1.0);
-	}
+void main(void) {
+	gl_Position = pMatrix * mvMatrix * vec4(vertexPosition, 1.0);
+}
 </script>
 
 <script type="text/javascript" src="renderer.js"></script>
