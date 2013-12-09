@@ -1,3 +1,8 @@
 WebGL tutorial: http://learningwebgl.com/blog/
 JavaScript reference: http://www.javascripture.com
 Model downloads: http://graphics.cs.williams.edu/data/meshes.xml
+
+Median cut: http://www.leptonica.com/papers/mediancut.pdf
+Octree quantisation: http://www.leptonica.com/papers/colorquant.pdf
+
+Edge detection: http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.93.9731&rep=rep1&type=pdf

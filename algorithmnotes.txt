@@ -1,0 +1,38 @@
+use CIELAB colour space (perceptually uniform) to find colours; assume sRGB
+-- ignore L (lightness) for now, since we're creating shades of those anyway; this makes the maths a bit easier
+-- use oct/quadtree method? Or just median cut?
+
+Once we have CIELAB representations of the base palette, vary L to get shadow/highlight tones, and put them in our palette
+
+After finding palette, create 4096x4096 texture, using (R << 4) | (B & 0x0F), (G << 4) | (B >> 4) (or some variation thereof)
+   as texture coordinates to look up colour (lose accuracy in low bits, but this is generally fine since the colour regions in
+   the lookup image will be pretty large). The lookup can be done in sRGB colour space, since we can precompute the texture in
+   CIELAB colour space to save having to convert between colour spaces in the shader.
+
+Instead of computing the colour space conversion each time, create two textures similar to the above to do the conversion - not
+   sure if this is faster (I suspect it is, but I'll do a test anyway; more quantitative results = better)
+
+For the above, using 8-bit RGB requires 4096x4096 textures, which might not be available on all systems (pretty sure the test
+   systems should handle it though); could use multiple smaller textures, or a smaller lower-resolution texture (makes the
+   colour space conversion/colour selection from palette less precise).
+
+This assumes 8-bit RGB colour, which is what the textures will use; internally I plan to use higher precision to reduce errors
+   in colour space conversion
+
+Outline options:
+-- use surface normal; surface is an edge if normal is perpendicular to screen (doesn't give good results, since non-smooth
+   polygons give non-uniform outlines)
+-- polygon offset to offset back facing polygons forwards (gives artifacts)
+-- depth/normal buffer edge detection (could be fun; not sure how to get 1-pixel outlines)
+-- use vertex normals to push vertices of front-facing polygons back exactly enough that one pixel's worth of the back facing
+   polygon is drawn over the top (more specific version of polygon offset strategy); this assumes vertex normals are reliable
+
+Detail preservation: add extra data to model (figure out some algorithm to compute this) that gives the size of the feature each
+   vertex is part of; then, in vertex shader, extrude vertex along normal if the screen space feature size is too small
+
+Possible method to find feature size - line through each polygon in opposite direction to polygon normal, find distance to first
+   polygon that it intersects with (might have to somehow account for only needing to stretch in screen x/y? Can't just project
+   to screen axes, since a ray perpendicular to screen will imply an infinitesimally-small feature)
+
+maybe scratch using WebGL to get more GLSL functions, as WebGL is based on GLES rather than core OpenGL (geometry shader might be
+   important, though I think I can work without it; GLES also doesn't have polygon modes for easy wireframe rendering)
