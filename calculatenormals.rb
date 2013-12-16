@@ -1,4 +1,5 @@
 require "matrix"
+require 'minitest/autorun'
 
 class Vector
  def cross_product(other)
@@ -6,6 +7,69 @@ class Vector
                 self[2] * other[0] - self[0] * other[2],
                 self[0] * other[1] - self[1] * other[0]]
  end
+end
+
+
+class Model
+ attr_accessor :vertexCoords
+ attr_accessor :vertexNormals
+ attr_accessor :texCoords
+ attr_accessor :faces
+end
+
+def loadObj(filename)
+ model = Model.new
+ vertices = []
+ texCoords = []
+ verticesWithTexture = []
+ vertexPairs = {}
+ currentVertex = 1
+ File.open(filename) {|f|
+  f.each_line {|l|
+   if l[/v (-?\d+(\.\d+)?) (-?\d+(\.\d+)?) (-?\d+(\.\d+)?)/]
+    vertices.push(Vector[$1.to_f, $3.to_f, $4.to_f])
+   elsif l[/vt (-?\d+(\.\d+)?) (-?\d+(\.\d+)?)/]
+    texCoords.push(Vector[$1.to_f, $3.to_f])
+   elsif l[/f (\d+)\/(\d+) (\d+)\/(\d+) (\d+)\/(\d+)( (\d+)\/(\d+))?/]
+    face = []
+    for pair in [[$1.to_i, $2.to_i], [$3.to_i, $4.to_i], [$5.to_i, $6.to_i]]
+     if (!vertexPairs[pair])
+	  vertexPairs[pair] = currentVertex
+	  currentVertex += 1
+	  verticesWithTexture.push([vertices[pair[0] - 1], texCoords[pair[1] - 1]])
+	 end
+	 face.push(vertexPairs[pair])
+	end
+    model.faces.push(face)
+	if $7
+	 pair = [$8.to_i, $9.to_i]
+	 if (!vertexPairs[pair])
+	  vertexPairs[pair] = currentVertex
+	  currentVertex += 1
+	  verticesWithTexture.push([vertices[pair[0] - 1], texCoords[pair[1] - 1]])
+	 end
+	 model.faces.push(model.faces.last[0], model.faces.last[2], vertexPairs[pair])
+	end
+   end
+  }
+ }
+ for v in verticesWithTexture
+  model.vertexCoords.push(v[0])
+  model.texCoords.push(v[1])
+ end
+ return model
+end
+
+def loadPly(filename)
+ 
+end
+
+def calculateNormalsObj(filename)
+ model = loadObj(filename)
+end
+
+def calculateNormalsPly(filename)
+ model = loadPly(filename)
 end
 
 def calculateNormals(filename)
@@ -60,4 +124,19 @@ def calculateNormals(filename)
  }
 end
 
-calculateNormals("Code/teapot.ply")
+class VectorTest < Minitest::Test
+
+def test_cross_product
+ v1 = Vector[2.0, 3.0, 4.0]
+ v2 = Vector[5.0, 6.0, 7.0]
+ v3 = v1.cross_product(v2)
+ v4 = v2.cross_product(v1)
+ answer = Vector[-3.0, 6.0, -3.0]
+ neganswer = Vector[-answer[0], -answer[1], -answer[2]]
+ assert_equal(v3, answer)
+ assert_equal(v4, neganswer)
+end
+
+end
+
+#calculateNormals("Code/teapot.ply")
