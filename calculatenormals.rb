@@ -119,9 +119,9 @@ def savePly(model, filename)
  File.open(filename, "w") {|f|
   f.write(model.plyHeader) if model.plyHeader
   for v in model.vertices
-   f.write(sprintf("%.5g %.5g %.5g %.5g %.5g %.5g", v.coords[0], v.coords[1], v.coords[2], v.normal[0], v.normal[1], v.normal[2]))
+   f.write(sprintf("%.5f %.5f %.5f %.5f %.5f %.5f", v.coords[0], v.coords[1], v.coords[2], v.normal[0], v.normal[1], v.normal[2]))
    if v.texCoords
-    f.write(sprintf(" %.5g %.5g", v.texCoords[0], v.texCoords[1]))
+    f.write(sprintf(" %.5f %.5f", v.texCoords[0], v.texCoords[1]))
    end
    f.write("\n")
   end
@@ -143,9 +143,6 @@ def calculateNormals(model)
  
  for v in model.vertices
   v.normal = v.normal.normalize
-  v.normal = Vector[0.0, v.normal[1], v.normal[2]] if v.normal[0].abs < 0.00001
-  v.normal = Vector[v.normal[0], 0.0, v.normal[2]] if v.normal[1].abs < 0.00001
-  v.normal = Vector[v.normal[0], v.normal[1], 0.0] if v.normal[2].abs < 0.00001
  end
  
  return model

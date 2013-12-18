@@ -11,18 +11,32 @@ varying vec2 varTexCoord;
 uniform sampler2D texture;
 uniform sampler2D paletteMap;
 
+// will optimise later
+uniform sampler2D palette;
+
 void main(void) {
 	vec3 transformedNormal = normalize(varNormal);
 	vec4 fragColor;
-	if (/*abs(normalize(eyeVec * transformedNormal)).z < 0.5*/!gl_FrontFacing) {
-		fragColor = vec4(0.0, 0.0, 0.0, 0.0);
-	} else {
-		float lightWeighting = max(transformedNormal.y + transformedNormal.x, 0.0) / 2.0;
-		vec3 lighting = vec3(1.0, 1.0, 1.0) * lightWeighting + vec3(0.2, 0.2, 0.2);
-		fragColor = texture2D(texture, varTexCoord) * vec4(lighting, 1.0);
+	float lightWeighting = max(transformedNormal.y + transformedNormal.x, 0.0) / 2.0;
+	vec3 lighting = vec3(1.0, 1.0, 1.0) * lightWeighting + vec3(0.5, 0.5, 0.5);
+	fragColor = texture2D(texture, varTexCoord) * vec4(lighting, 1.0);
+	if (abs(dot(normalize(eyeVec), transformedNormal)) < 0.2) {
+		fragColor = vec4(fragColor.rgb * (abs(dot(normalize(eyeVec), transformedNormal)) * 5.0), 1.0);
 	}
-	vec2 paletteMapIndex = vec2(floor(fragColor.r * 255.0) * 16.0 + floor(fragColor.g * 16.0), floor(fragColor.b * 255.0) * 16.0 + floor(mod(fragColor.g * 255.0, 16.0)));
-	gl_FragColor = fragColor;//texture2D(paletteMap, paletteMapIndex);
+	//vec2 paletteMapIndex = vec2(floor(fragColor.r * 255.0) * 16.0 + floor(fragColor.g * 16.0), floor(fragColor.b * 255.0) * 16.0 + floor(mod(fragColor.g * 255.0, 16.0)));
+	float bestDist = 2.0;
+	vec4 bestColor;
+	vec4 paletteColor;
+	int paletteSize = 8; // TODO: pass this value in from main program since WebGL apparently doesn't support GLSL textureSize
+	for (int i = 0; i < 16; i++) {
+		paletteColor = texture2D(palette, vec2((float(i) + 0.5) / 16.0, 0));
+		float dist = distance(paletteColor, fragColor);
+		if (dist < bestDist) {
+			bestColor = paletteColor;
+			bestDist = dist;
+		}
+	}
+	gl_FragColor = bestColor;//texture2D(paletteMap, paletteMapIndex);
 }
 </script>
 

@@ -75,6 +75,7 @@ function initShaders() {
 	shader.vertexNormal = gl.getAttribLocation(shader, "vertexNormal");
 	shader.texCoord = gl.getAttribLocation(shader, "texCoord");
 	shader.texture = gl.getUniformLocation(shader, "texture");
+	shader.palette = gl.getUniformLocation(shader, "palette");
 	shader.pMatrix = gl.getUniformLocation(shader, "pMatrix");
 	shader.mvMatrix = gl.getUniformLocation(shader, "mvMatrix");
 	shader.nMatrix = gl.getUniformLocation(shader, "nMatrix");
@@ -210,10 +211,11 @@ function handleLoadModel(data, model) {
 
 function handleLoadedTexture(model) {
 	gl.bindTexture(gl.TEXTURE_2D, model.texture);
-	gl.pixelStorei(gl.UNPACK_WEBGL, true);
+	gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
 	gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, model.texture.image);
 	gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
 	gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+	gl.bindTexture(gl.TEXTURE_2D, null);
 }
 
 function loadModel(filename, model) {
@@ -228,14 +230,24 @@ function loadModel(filename, model) {
 	request.send();
 }
 
-function loadTexture(filename, model) {
+function loadTexture(filename, model, palette) {
 	model.texture = gl.createTexture();
 	model.texture.image = new Image();
 	model.texture.image.onload = function() {
-		alert("LOADING");
 		handleLoadedTexture(model);
 	}
 	model.texture.image.src = filename;
+	// TODO: auto-generate palette using median cut or octree quantisation; for now, load from file
+	model.palette = gl.createTexture();
+	model.palette.image = new Image();
+	model.palette.image.onload = function() {
+		gl.bindTexture(gl.TEXTURE_2D, model.palette);
+		gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, model.palette.image);
+		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+		gl.bindTexture(gl.TEXTURE_2D, null);
+	}
+	model.palette.image.src = "palette.png";
 }
 
 function drawModel(shader, model) {
@@ -253,6 +265,9 @@ function drawModel(shader, model) {
 	gl.activeTexture(gl.TEXTURE0);
 	gl.bindTexture(gl.TEXTURE_2D, model.texture);
 	gl.uniform1i(shader.texture, 0);
+	gl.activeTexture(gl.TEXTURE1);
+	gl.bindTexture(gl.TEXTURE_2D, model.palette);
+	gl.uniform1i(shader.palette, 1);
 	gl.enableVertexAttribArray(shader.texCoordBuffer);
 	if (model.normalBuffer != null) {
 		gl.bindBuffer(gl.ARRAY_BUFFER, model.normalBuffer);
@@ -315,8 +330,8 @@ function start() {
 	initGL(canvas);
 	initBasicShader();
 	initShaders();
-	loadModel("teapot_withnormals.ply", teapotModel);
-	loadTexture("texture2.png", teapotModel);
+	loadModel("teapot2.ply", teapotModel);
+	loadTexture("background.png", teapotModel);
 	gl.clearColor(1.0, 1.0, 1.0, 1.0);
 	gl.enable(gl.DEPTH_TEST);
 	gl.depthFunc(gl.LEQUAL);
