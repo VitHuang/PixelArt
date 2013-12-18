@@ -10,9 +10,7 @@ var cielabToSrgbTexture;
 var mvMatrix = mat4.create();
 var pMatrix = mat4.create();
 var normalMatrix = mat3.create();
-var vertexBuffer;
-var normalBuffer;
-var indexBuffer;
+var teapotModel = new Object;
 
 function initGL(canvas) {
 	try {
@@ -75,6 +73,8 @@ function initShaders() {
 	gl.useProgram(shader);
 	shader.vertexPosition = gl.getAttribLocation(shader, "vertexPosition");
 	shader.vertexNormal = gl.getAttribLocation(shader, "vertexNormal");
+	shader.texCoord = gl.getAttribLocation(shader, "texCoord");
+	shader.texture = gl.getUniformLocation(shader, "texture");
 	shader.pMatrix = gl.getUniformLocation(shader, "pMatrix");
 	shader.mvMatrix = gl.getUniformLocation(shader, "mvMatrix");
 	shader.nMatrix = gl.getUniformLocation(shader, "nMatrix");
@@ -87,6 +87,7 @@ function initBasicShader() {
 	gl.enableVertexAttribArray(basicShader.vertexPosition);
 	basicShader.pMatrix = gl.getUniformLocation(basicShader, "pMatrix");
 	basicShader.mvMatrix = gl.getUniformLocation(basicShader, "mvMatrix");
+	gl.disableVertexAttribArray(basicShader.vertexPosition);
 }
 
 function initSrgbToCielabShader() {
@@ -98,6 +99,7 @@ function initSrgbToCielabShader() {
 	srgbToCielabShader.mvMatrix = gl.getUniformLocation(srgbToCielabShader, "mvMatrix");
 	srgbToCielabShader.conversionMatrix = mat3.create([2.7688, 1.7517, 1.1301, 1.0, 4.5906, 0.060067, 0.0, 0.056507, 5.5942]);
 	srgbToCielabShader.rgbConversion = gl.getUniformLocation(srgbToCielabShader, "rgbConversion");
+	gl.disableVertexAttribArray(srgbToCielabShader.vertexPosition);
 	
 }
 
@@ -110,6 +112,7 @@ function initCielabToSrgbShader() {
 	cielabToSrgbShader.mvMatrix = gl.getUniformLocation(cielabToSrgbShader, "mvMatrix");
 	cielabToSrgbShader.conversionMatrix = mat3.create([0.41847, -0.15866, -0.082835, -0.91169, 0.25243, 0.015708, 0.00092090, -0.0025498, 0.17860]);
 	cielabToSrgbShader.xyzConversion = gl.getUniformLocation(cielabToSrgbShader, "xyzConversion");
+	gl.disableVertexAttribArray(cielabToSrgbShader.vertexPosition);
 }
 
 function createConversionTextures() {
@@ -135,7 +138,7 @@ function createConversionTextures() {
 }
 
 
-function handleLoadModel(data) {
+function handleLoadModel(data, model) {
 	var lines = data.split("\n");
 	var currentVertex = 0;
 	var vertexCount = 0;
@@ -143,6 +146,7 @@ function handleLoadModel(data) {
 	var faceCount = 0;
 	var vertices = [];
 	var normals = [];
+	var texCoords = []
 	var faces = [];
 	var inHeader = true;
 	var match;
@@ -162,13 +166,15 @@ function handleLoadModel(data) {
 		}
 		if (!inHeader) {
 			var split = lines[i].replace(/^\s+/, "").split(/\s+/);
-			if (split.length >= 6 && currentVertex < vertexCount) {
+			if (split.length >= 8 && currentVertex < vertexCount) {
 				vertices.push(parseFloat(split[0]));
 				vertices.push(parseFloat(split[1]));
 				vertices.push(parseFloat(split[2]));
 				normals.push(parseFloat(split[3]));
 				normals.push(parseFloat(split[4]));
 				normals.push(parseFloat(split[5]));
+				texCoords.push(parseFloat(split[6]));
+				texCoords.push(parseFloat(split[7]));
 				currentVertex += 1;
 			}
 			if (split.length >= 4 && currentVertex >= vertexCount && currentFace < faceCount) {
@@ -180,74 +186,104 @@ function handleLoadModel(data) {
 			}
 		}
 	}
-	vertexBuffer = gl.createBuffer();
-	gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer);
+	model.vertexBuffer = gl.createBuffer();
+	gl.bindBuffer(gl.ARRAY_BUFFER, model.vertexBuffer);
 	gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.STATIC_DRAW);
-	vertexBuffer.itemSize = 3;
-	vertexBuffer.numItems = vertexCount;
-	normalBuffer = gl.createBuffer();
-	gl.bindBuffer(gl.ARRAY_BUFFER, normalBuffer);
+	model.vertexBuffer.itemSize = 3;
+	model.vertexBuffer.numItems = vertexCount;
+	model.normalBuffer = gl.createBuffer();
+	gl.bindBuffer(gl.ARRAY_BUFFER, model.normalBuffer);
 	gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(normals), gl.STATIC_DRAW);
-	normalBuffer.itemSize = 3;
-	normalBuffer.numItems = vertexCount;
-	indexBuffer = gl.createBuffer();
-	gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indexBuffer);
+	model.normalBuffer.itemSize = 3;
+	model.normalBuffer.numItems = vertexCount;
+	model.texCoordBuffer = gl.createBuffer();
+	gl.bindBuffer(gl.ARRAY_BUFFER, model.texCoordBuffer);
+	gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(texCoords), gl.STATIC_DRAW);
+	model.vertexBuffer.itemSize = 2;
+	model.vertexBuffer.numItems = vertexCount;
+	model.indexBuffer = gl.createBuffer();
+	gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, model.indexBuffer);
 	gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(faces), gl.STATIC_DRAW);
-	indexBuffer.itemSize = 1;
-	indexBuffer.numItems = faceCount * 3;
+	model.indexBuffer.itemSize = 1;
+	model.indexBuffer.numItems = faceCount * 3;
 }
 
-function loadModel() {
+function handleLoadedTexture(model) {
+	gl.bindTexture(gl.TEXTURE_2D, model.texture);
+	gl.pixelStorei(gl.UNPACK_WEBGL, true);
+	gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, model.texture.image);
+	gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+	gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+}
+
+function loadModel(filename, model) {
 	var request = new XMLHttpRequest();
 	request.overrideMimeType('text/plain');
-	request.open("GET", "teapot_withnormals.ply");
+	request.open("GET", filename);
 	request.onreadystatechange = function() {
 		if (request.readyState == 4) {
-			handleLoadModel(request.responseText);
+			handleLoadModel(request.responseText, model);
 		}
 	}
 	request.send();
 }
 
-function drawBuffers(shader, vertexBuffer, indexBuffer, normalBuffer) {
+function loadTexture(filename, model) {
+	model.texture = gl.createTexture();
+	model.texture.image = new Image();
+	model.texture.image.onload = function() {
+		alert("LOADING");
+		handleLoadedTexture(model);
+	}
+	model.texture.image.src = filename;
+}
+
+function drawModel(shader, model) {
 	gl.useProgram(shader);
 	gl.uniformMatrix4fv(shader.pMatrix, false, pMatrix);
 	gl.uniformMatrix4fv(shader.mvMatrix, false, mvMatrix);
-	if (normalBuffer != null) {
+	if (model.normalBuffer != null) {
 		gl.uniformMatrix3fv(shader.nMatrix, false, normalMatrix);
 	}
-	gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer);
+	gl.bindBuffer(gl.ARRAY_BUFFER, model.vertexBuffer);
 	gl.vertexAttribPointer(shader.vertexPosition, 3, gl.FLOAT, false, 0, 0);
 	gl.enableVertexAttribArray(shader.vertexPosition);
-	if (normalBuffer != null) {
-		gl.bindBuffer(gl.ARRAY_BUFFER, normalBuffer);
+	gl.bindBuffer(gl.ARRAY_BUFFER, model.texCoordBuffer);
+	gl.vertexAttribPointer(shader.texCoord, 2, gl.FLOAT, false, 0, 0);
+	gl.activeTexture(gl.TEXTURE0);
+	gl.bindTexture(gl.TEXTURE_2D, model.texture);
+	gl.uniform1i(shader.texture, 0);
+	gl.enableVertexAttribArray(shader.texCoordBuffer);
+	if (model.normalBuffer != null) {
+		gl.bindBuffer(gl.ARRAY_BUFFER, model.normalBuffer);
 		gl.vertexAttribPointer(shader.vertexNormal, 3, gl.FLOAT, true, 0, 0);
 		gl.enableVertexAttribArray(shader.vertexNormal);
 	}
-	gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indexBuffer);
-	gl.drawElements(gl.TRIANGLES, indexBuffer.numItems, gl.UNSIGNED_SHORT, 0);
+	gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, model.indexBuffer);
+	gl.drawElements(gl.TRIANGLES, model.indexBuffer.numItems, gl.UNSIGNED_SHORT, 0);
+	gl.disableVertexAttribArray(shader.vertexPosition);
 	gl.disableVertexAttribArray(shader.vertexNormal);
 }
 
 function draw() {
-	if (vertexBuffer == null) {
+	if (teapotModel.vertexBuffer == null) {
 		return;
 	}
 	gl.viewport(0, 0, gl.viewportWidth, gl.viewportHeight);
 	gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-	mat4.perspective(45, gl.viewportWidth / gl.viewportHeight, 0.1, 100.0, pMatrix);
+	mat4.perspective(45, gl.viewportWidth / gl.viewportHeight, 0.1, 300.0, pMatrix);
 	mat4.identity(mvMatrix);
 
-	mat4.translate(mvMatrix, [0.0, -1.0, -9.0]);
-	mat4.rotate(mvMatrix, 1.0, [-1.0, 0.0, 0.0]);
-	mat4.rotate(mvMatrix, time, [0.0, 0.0, 1.0]);
+	mat4.translate(mvMatrix, [0.0, -20.0, -200.0]);
+	mat4.rotate(mvMatrix, 0.5, [1.0, 0.0, 0.0]);
+	mat4.rotate(mvMatrix, time, [0.0, 1.0, 0.0]);
 
 	mat4.toInverseMat3(mvMatrix, normalMatrix);
 	mat3.transpose(normalMatrix);
 	
 	/*gl.enable(gl.CULL_FACE);
 	gl.cullFace(gl.BACK);*/
-	drawBuffers(shader, vertexBuffer, indexBuffer, normalBuffer);
+	drawModel(shader, teapotModel);
 	//gl.disable(gl.CULL_FACE);
 
 	//testOutline();
@@ -259,10 +295,10 @@ function testOutline() {
 	gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 	gl.enable(gl.CULL_FACE);
 	gl.cullFace(gl.BACK);
-	drawBuffers(shader, vertexBuffer, indexBuffer, normalBuffer);
+	drawModel(shader, teapotModel);
 	gl.disable(gl.CULL_FACE);
 	gl.disable(gl.DEPTH_TEST);
-	drawBuffers(basicShader, vertexBuffer, indexBuffer, null);
+	drawBuffers(basicShader, teapotModel);
 	gl.enable(gl.DEPTH_TEST);
 }
 
@@ -279,7 +315,8 @@ function start() {
 	initGL(canvas);
 	initBasicShader();
 	initShaders();
-	loadModel();
+	loadModel("teapot_withnormals.ply", teapotModel);
+	loadTexture("texture2.png", teapotModel);
 	gl.clearColor(1.0, 1.0, 1.0, 1.0);
 	gl.enable(gl.DEPTH_TEST);
 	gl.depthFunc(gl.LEQUAL);

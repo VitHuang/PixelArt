@@ -11,10 +11,24 @@ end
 
 
 class Model
- attr_accessor :vertexCoords
- attr_accessor :vertexNormals
- attr_accessor :texCoords
+ class Vertex
+  attr_accessor :coords
+  attr_accessor :normal
+  attr_accessor :texCoords
+  def initialize(coords, normal = Vector[0.0, 0.0, 0.0], texCoords = nil)
+   @coords = coords
+   @normal = normal
+   @texCoords = texCoords
+  end
+ end
+ attr_accessor :vertices
  attr_accessor :faces
+ attr_accessor :plyHeader
+ def initialize
+  @vertices = []
+  @faces = []
+  @plyHeader = ""
+ end
 end
 
 def loadObj(filename)
@@ -23,14 +37,14 @@ def loadObj(filename)
  texCoords = []
  verticesWithTexture = []
  vertexPairs = {}
- currentVertex = 1
+ currentVertex = 0
  File.open(filename) {|f|
   f.each_line {|l|
-   if l[/v (-?\d+(\.\d+)?) (-?\d+(\.\d+)?) (-?\d+(\.\d+)?)/]
-    vertices.push(Vector[$1.to_f, $3.to_f, $4.to_f])
-   elsif l[/vt (-?\d+(\.\d+)?) (-?\d+(\.\d+)?)/]
+   if l[/v\s+(-?\d+(\.\d+)?)\s+(-?\d+(\.\d+)?)\s+(-?\d+(\.\d+)?)/]
+    vertices.push(Vector[$1.to_f, $3.to_f, $5.to_f])
+   elsif l[/vt\s+(-?\d+(\.\d+)?)\s+(-?\d+(\.\d+)?)/]
     texCoords.push(Vector[$1.to_f, $3.to_f])
-   elsif l[/f (\d+)\/(\d+) (\d+)\/(\d+) (\d+)\/(\d+)( (\d+)\/(\d+))?/]
+   elsif l[/f\s+(\d+)\/(\d+)\s+(\d+)\/(\d+)\s+(\d+)\/(\d+)(\s+(\d+)\/(\d+))?/]
     face = []
     for pair in [[$1.to_i, $2.to_i], [$3.to_i, $4.to_i], [$5.to_i, $6.to_i]]
      if (!vertexPairs[pair])
@@ -48,80 +62,94 @@ def loadObj(filename)
 	  currentVertex += 1
 	  verticesWithTexture.push([vertices[pair[0] - 1], texCoords[pair[1] - 1]])
 	 end
-	 model.faces.push(model.faces.last[0], model.faces.last[2], vertexPairs[pair])
+	 model.faces.push([model.faces.last[0], model.faces.last[2], vertexPairs[pair]])
 	end
    end
   }
  }
  for v in verticesWithTexture
-  model.vertexCoords.push(v[0])
-  model.texCoords.push(v[1])
+  model.vertices.push(Model::Vertex.new(v[0], Vector[0.0, 0.0, 0.0], v[1]))
  end
+ model.plyHeader = "ply\nformat ascii 1.0\nelement vertex #{model.vertices.size}\n" +
+ "property float x\nproperty float y\nproperty float z\nproperty float nx\nproperty float ny\nproperty float nz\n" +
+ "property float u\nproperty float v\nelement face #{model.faces.size}\nproperty list uint8 int32 vertex_indices\nend_header"
  return model
 end
 
 def loadPly(filename)
- 
-end
 
-def calculateNormalsObj(filename)
- model = loadObj(filename)
-end
-
-def calculateNormalsPly(filename)
- model = loadPly(filename)
-end
-
-def calculateNormals(filename)
-
- vertices = []
- faces = []
- vertexNormalDirections = []
-
- header = ""
+ model = Model.new
+ model.plyHeader = ""
  inHeader = true
 
  File.open(filename) {|f|
   f.each_line {|l|
    if inHeader
-    header += l
+    model.plyHeader += l
     if l[/property float(\d+)? z/]
-     header += "property float nx\nproperty float ny\nproperty float nz\n"
+     model.plyHeader += "property float nx\nproperty float ny\nproperty float nz\n"
     elsif l[/end_header/]
      inHeader = false
     end
    else
     if l[/^(-?\d+(\.\d+)?) (-?\d+(\.\d+)?) (-?\d+(\.\d+)?)[^0-9]+$/]
-     vertices.push(Vector[$1.to_f, $3.to_f, $5.to_f])
-     vertexNormalDirections.push(Vector[0.0, 0.0, 0.0])
+     model.vertices.push(Model::Vertex.new(Vector[$1.to_f, $3.to_f, $5.to_f]))
     elsif l[/3 (\d+) (\d+) (\d+)/]
-     faces.push([$1.to_i, $2.to_i, $3.to_i])
+     model.faces.push([$1.to_i, $2.to_i, $3.to_i])
     end
    end
   }
  }
- puts vertices.size
- for f in faces
-  #puts f.inspect
-  v1 = vertices[f[1]] - vertices[f[0]]
-  v2 = vertices[f[2]] - vertices[f[0]]
-  normalDirection = v1.cross_product(v2)
-  vertexNormalDirections[f[0]] += normalDirection
-  vertexNormalDirections[f[1]] += normalDirection
-  vertexNormalDirections[f[2]] += normalDirection
- end
+ return model
+end
 
- vertexNormals = vertexNormalDirections.collect {|v| v.normalize }
+def calculateNormalsObj(filename)
+ model = loadObj(filename)
+ calculateNormals(model)
+ savePly(model, filename.sub(".obj", "_withnormals.ply"))
+end
 
- File.open(filename.sub(".ply", "_withnormals.ply"), "w") {|f|
-  f.write(header)
-  for i in 0...vertices.length
-   f.write(sprintf("%.5g %.5g %.5g %.5g %.5g %.5g\n", vertices[i][0], vertices[i][1], vertices[i][2], vertexNormals[i][0], vertexNormals[i][1], vertexNormals[i][2]))
+def calculateNormalsPly(filename)
+ model = loadPly(filename)
+ calculateNormals(model)
+ savePly(model, filename.sub(".ply", "_withnormals.ply"))
+end
+
+def savePly(model, filename)
+ File.open(filename, "w") {|f|
+  f.write(model.plyHeader) if model.plyHeader
+  for v in model.vertices
+   f.write(sprintf("%.5g %.5g %.5g %.5g %.5g %.5g", v.coords[0], v.coords[1], v.coords[2], v.normal[0], v.normal[1], v.normal[2]))
+   if v.texCoords
+    f.write(sprintf(" %.5g %.5g", v.texCoords[0], v.texCoords[1]))
+   end
+   f.write("\n")
   end
-  for face in faces
+  for face in model.faces
    f.write("3 #{face[0]} #{face[1]} #{face[2]}\n")
   end
  }
+end
+
+def calculateNormals(model)
+ for f in model.faces
+  v1 = model.vertices[f[1]].coords - model.vertices[f[0]].coords
+  v2 = model.vertices[f[2]].coords - model.vertices[f[0]].coords
+  normalDirection = v1.cross_product(v2)
+  model.vertices[f[0]].normal += normalDirection
+  model.vertices[f[1]].normal += normalDirection
+  model.vertices[f[2]].normal += normalDirection
+ end
+ 
+ for v in model.vertices
+  v.normal = v.normal.normalize
+  v.normal = Vector[0.0, v.normal[1], v.normal[2]] if v.normal[0].abs < 0.00001
+  v.normal = Vector[v.normal[0], 0.0, v.normal[2]] if v.normal[1].abs < 0.00001
+  v.normal = Vector[v.normal[0], v.normal[1], 0.0] if v.normal[2].abs < 0.00001
+ end
+ 
+ return model
+
 end
 
 class VectorTest < Minitest::Test
@@ -139,4 +167,4 @@ end
 
 end
 
-#calculateNormals("Code/teapot.ply")
+calculateNormalsObj("teapot.obj")

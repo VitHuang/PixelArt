@@ -7,38 +7,42 @@
 precision mediump float;
 varying vec3 varNormal;
 varying vec3 eyeVec;
+varying vec2 varTexCoord;
+uniform sampler2D texture;
 uniform sampler2D paletteMap;
 
 void main(void) {
 	vec3 transformedNormal = normalize(varNormal);
-	vec3 fragColor;
+	vec4 fragColor;
 	if (/*abs(normalize(eyeVec * transformedNormal)).z < 0.5*/!gl_FrontFacing) {
-		fragColor = vec3(0.0, 0.0, 0.0);
+		fragColor = vec4(0.0, 0.0, 0.0, 0.0);
 	} else {
-		float lightWeighting = max(transformedNormal.x, 0.0);
-		float lightWeighting2 = max(transformedNormal.y, 0.0);
-		vec3 lighting = vec3(1.0, 0.4, 0.0) * lightWeighting + vec3(0.0, 0.2, 1.0) * lightWeighting2 + vec3(0.2, 0.2, 0.2);
-		fragColor = lighting;
+		float lightWeighting = max(transformedNormal.y + transformedNormal.x, 0.0) / 2.0;
+		vec3 lighting = vec3(1.0, 1.0, 1.0) * lightWeighting + vec3(0.2, 0.2, 0.2);
+		fragColor = texture2D(texture, varTexCoord) * vec4(lighting, 1.0);
 	}
 	vec2 paletteMapIndex = vec2(floor(fragColor.r * 255.0) * 16.0 + floor(fragColor.g * 16.0), floor(fragColor.b * 255.0) * 16.0 + floor(mod(fragColor.g * 255.0, 16.0)));
-	gl_FragColor = vec4(fragColor, 1.0);//texture2D(paletteMap, paletteMapIndex);
+	gl_FragColor = fragColor;//texture2D(paletteMap, paletteMapIndex);
 }
 </script>
 
 <script id="shader-vs" type="x-shader/x-vertex">
 attribute vec3 vertexPosition;
 attribute vec3 vertexNormal;
+attribute vec2 texCoord;
 
 uniform mat4 pMatrix;
 uniform mat4 mvMatrix;
 uniform mat3 nMatrix;
 
 varying vec3 varNormal;
+varying vec2 varTexCoord;
 varying vec3 eyeVec;
 
 void main(void) {
 	gl_Position = pMatrix * mvMatrix * vec4(vertexPosition, 1.0);
 	varNormal = normalize(nMatrix * vertexNormal);
+	varTexCoord = texCoord;
 	eyeVec = (mvMatrix * vec4(vertexPosition, 1.0)).xyz;
 }
 </script>
