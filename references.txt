@@ -8,3 +8,5 @@ Octree quantisation: http://www.leptonica.com/papers/colorquant.pdf
 Edge detection: http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.93.9731&rep=rep1&type=pdf
 
 Voronoi diagrams using graphics hardware: https://wwwx.cs.unc.edu/~geom/papers/documents/technicalreports/tr99011.pdf
+
+GPU-based Canny edge detection: http://www.prasa.org/proceedings/2007/prasa07-26.pdf
