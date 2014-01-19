@@ -4,9 +4,11 @@ var basicShader;
 var textureShader;
 var pixelShader;
 var normalShader;
+var directedNormalShader;
 var depthShader;
 var sobelShader;
 var cannyShader;
+var outlineShader;
 var conversionFramebuffer;
 var srgbToCielabShader;
 var srgbToCielabTexture;
@@ -25,24 +27,30 @@ var edgeTexture;
 var screenTexture;
 var rectBuffer;
 var loadedShaders = false;
+var stereoscopic = false;
+var drawOutlines = true;
 var transVal = 12.0;
 
 function screenBufferWidth() {
-	return 256;
+	return 128;
 }
 
 function screenBufferHeight() {
-	return 256;
+	return 128;
 }
 
 function areShadersLoaded() {
-	return basicShader.loaded && textureShader.loaded && pixelShader.loaded && normalShader.loaded && depthShader.loaded && sobelShader.loaded && cannyShader.loaded;
+	return basicShader.loaded && textureShader.loaded && pixelShader.loaded && /*normalShader.loaded && */depthShader.loaded && /*sobelShader.loaded && cannyShader.loaded && */directedNormalShader.loaded && outlineShader.loaded;
 }
 
 function initGL(canvas) {
 	try {
 		gl = canvas.getContext("webgl"/*, {antialias:false}*/);
-		gl.viewportWidth = canvas.width / 2;
+		if (stereoscopic) {
+			gl.viewportWidth = canvas.width / 2;
+		} else {
+			gl.viewportWidth = canvas.width;
+		}
 		gl.viewportHeight = canvas.height;
 	} catch (e) {
 	}
@@ -153,6 +161,8 @@ function initPixelShader() {
 		pixelShader.vertexNormal = gl.getAttribLocation(pixelShader, "vertexNormal");
 		pixelShader.texCoord = gl.getAttribLocation(pixelShader, "texCoord");
 		pixelShader.texture = gl.getUniformLocation(pixelShader, "texture");
+		pixelShader.edgeTexture = gl.getUniformLocation(pixelShader, "edgeTexture");
+		pixelShader.textureSize = gl.getUniformLocation(pixelShader, "textureSize");
 		pixelShader.palette = gl.getUniformLocation(pixelShader, "palette");
 		pixelShader.pMatrix = gl.getUniformLocation(pixelShader, "pMatrix");
 		pixelShader.mvMatrix = gl.getUniformLocation(pixelShader, "mvMatrix");
@@ -202,6 +212,19 @@ function initNormalShader() {
 	}
 }
 
+function initDirectedNormalShader() {
+	directedNormalShader = createShaderFromFiles("directednormal.vs", "directednormal.fs");
+	directedNormalShader.onLink = function() {
+		gl.useProgram(directedNormalShader);
+		directedNormalShader.vertexPosition = gl.getAttribLocation(directedNormalShader, "vertexPosition");
+		directedNormalShader.vertexNormal = gl.getAttribLocation(directedNormalShader, "vertexNormal");
+		directedNormalShader.pMatrix = gl.getUniformLocation(directedNormalShader, "pMatrix");
+		directedNormalShader.mvMatrix = gl.getUniformLocation(directedNormalShader, "mvMatrix");
+		directedNormalShader.nMatrix = gl.getUniformLocation(directedNormalShader, "nMatrix");
+		directedNormalShader.loaded = true;
+	}
+}
+
 function initDepthShader() {
 	depthShader = createShaderFromFiles("depth.vs", "depth.fs");
 	depthShader.onLink = function() {
@@ -247,6 +270,23 @@ function initCannyShader() {
 		cannyShader.normalTexture = gl.getUniformLocation(cannyShader, "normalTexture");
 		cannyShader.textureSize = gl.getUniformLocation(cannyShader, "textureSize");
 		cannyShader.loaded = true;
+	}
+}
+
+function initOutlineShader() {
+	outlineShader = createShaderFromFiles("outline.vs", "outline.fs");
+	outlineShader.onLink = function() {
+		gl.useProgram(outlineShader);
+		outlineShader.vertexPosition = gl.getAttribLocation(outlineShader, "vertexPosition");
+		gl.enableVertexAttribArray(outlineShader.vertexPosition);
+		outlineShader.texCoord = gl.getAttribLocation(outlineShader, "texCoord");
+		gl.enableVertexAttribArray(outlineShader.texCoord);
+		outlineShader.pMatrix = gl.getUniformLocation(outlineShader, "pMatrix");
+		outlineShader.mvMatrix = gl.getUniformLocation(outlineShader, "mvMatrix");
+		outlineShader.depthTexture = gl.getUniformLocation(outlineShader, "depthTexture");
+		outlineShader.directedNormalTexture = gl.getUniformLocation(outlineShader, "directedNormalTexture");
+		outlineShader.textureSize = gl.getUniformLocation(outlineShader, "textureSize");
+		outlineShader.loaded = true;
 	}
 }
 
@@ -431,8 +471,38 @@ function loadTexture(filename, model, palette) {
 		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
 		gl.bindTexture(gl.TEXTURE_2D, null);
 	}
-	model.palette.image.src = "palette.png";
+	model.palette.image.src = "palette3.png";
 }
+
+function renderOutlineNew(model) {
+	gl.bindFramebuffer(gl.FRAMEBUFFER, screenFramebuffer);
+	
+	gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, normalTexture, 0);
+	gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+	drawModel(directedNormalShader, model);
+	
+	gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, depthTexture, 0);
+	gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+	gl.useProgram(depthShader);
+	drawModel(depthShader, model);
+	
+	gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, edgeTexture, 0);
+	gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+	gl.useProgram(outlineShader);
+	gl.activeTexture(gl.TEXTURE0);
+	gl.bindTexture(gl.TEXTURE_2D, depthTexture);
+	gl.uniform1i(outlineShader.depthTexture, 0);
+	gl.activeTexture(gl.TEXTURE1);
+	gl.bindTexture(gl.TEXTURE_2D, normalTexture);
+	gl.uniform1i(outlineShader.directedNormalTexture, 1);
+	gl.activeTexture(gl.TEXTURE0);
+	gl.uniform2i(outlineShader.textureSize, screenBufferWidth(), screenBufferHeight());
+	drawRectangle(outlineShader);
+	
+	gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, screenTexture, 0);
+	gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+}
+
 
 function renderOutline(model) {
 	gl.bindFramebuffer(gl.FRAMEBUFFER, screenFramebuffer);
@@ -501,7 +571,10 @@ function drawModel(shader, model) {
 	mat4.perspective(45, screenBufferWidth() / screenBufferHeight(), 150.0, 400.0, pMatrix);
 	mat4.identity(mvMatrix);
 
-	mat4.translate(mvMatrix, [transVal, -20.0, -250.0]);
+	mat4.translate(mvMatrix, [0.0, -20.0, -300.0]);
+	if (stereoscopic) {
+		mat4.translate(mvMatrix, [transVal, 0.0, 0.0]);
+	}
 	mat4.rotate(mvMatrix, 0.5, [1.0, 0.0, 0.0]);
 	mat4.rotate(mvMatrix, time, [0.0, 1.0, 0.0]);
 
@@ -554,22 +627,32 @@ function draw() {
 		return;
 	}
 	gl.viewport(0, 0, screenBufferWidth(), screenBufferHeight());
-	renderOutline(teapotModel);
-	//gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+	if (drawOutlines) {
+		renderOutlineNew(teapotModel);
+		//gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+	}
 	gl.bindFramebuffer(gl.FRAMEBUFFER, screenFramebuffer);
 	gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, screenTexture, 0);
 	gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-	drawModel(pixelShader, teapotModel);
-	gl.disable(gl.DEPTH_TEST);
-	gl.enable(gl.BLEND);
-	gl.blendFunc(gl.ONE_MINUS_SRC_COLOR, gl.SRC_COLOR);
+	gl.useProgram(pixelShader);
+	gl.activeTexture(gl.TEXTURE2);
 	gl.bindTexture(gl.TEXTURE_2D, edgeTexture);
-	gl.useProgram(textureShader);
-	drawRectangle(textureShader);
-	gl.enable(gl.DEPTH_TEST);
-	gl.disable(gl.BLEND);
+	gl.uniform1i(pixelShader.edgeTexture, 2);
+	gl.uniform2i(pixelShader.textureSize, screenBufferWidth(), screenBufferHeight());
+	gl.activeTexture(gl.TEXTURE0);
+	drawModel(pixelShader, teapotModel);
+	/*if (drawOutlines) {
+		gl.disable(gl.DEPTH_TEST);
+		gl.enable(gl.BLEND);
+		gl.blendFunc(gl.ZERO, gl.SRC_COLOR);
+		gl.bindTexture(gl.TEXTURE_2D, edgeTexture);
+		gl.useProgram(textureShader);
+		drawRectangle(textureShader);
+		gl.enable(gl.DEPTH_TEST);
+		gl.disable(gl.BLEND);
+	}*/
 	gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-	gl.viewport(transVal < 0 ? gl.viewportWidth : 0, 0, gl.viewportWidth, gl.viewportHeight);
+	gl.viewport((stereoscopic && transVal < 0) ? gl.viewportWidth : 0, 0, gl.viewportWidth, gl.viewportHeight);
 	gl.bindTexture(gl.TEXTURE_2D, screenTexture);
 	drawRectangle(textureShader);
 }
@@ -589,8 +672,10 @@ function testOutline() {
 function tick() {
 	requestAnimFrame(tick);
 	draw();
-	transVal = -transVal;
-	draw();
+	if (stereoscopic) {
+		transVal = -transVal;
+		draw();
+	}
 	time += 0.01;
 }
 
@@ -598,9 +683,11 @@ function loadShaders() {
 	initPixelShader();
 	initBasicShader();
 	initDepthShader();
-	initNormalShader();
-	initSobelShader();
-	initCannyShader();
+	//initNormalShader();
+	//initSobelShader();
+	//initCannyShader();
+	initDirectedNormalShader();
+	initOutlineShader();
 	initTextureShader();
 }
 
@@ -617,7 +704,7 @@ function start() {
 	depthTexture = setupScreenTexture();
 	initScreenFramebuffer();
 	loadModel("teapot2.ply", teapotModel);
-	loadTexture("background.png", teapotModel);
+	loadTexture("texture3.png", teapotModel);
 	gl.clearColor(1.0, 1.0, 1.0, 1.0);
 	gl.enable(gl.DEPTH_TEST);
 	gl.depthFunc(gl.LEQUAL);
