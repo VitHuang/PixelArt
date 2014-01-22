@@ -2,6 +2,7 @@ var gl;
 var time = 0.0;
 var basicShader;
 var textureShader;
+var phongShader;
 var pixelShader;
 var normalShader;
 var directedNormalShader;
@@ -14,6 +15,7 @@ var srgbToCielabShader;
 var srgbToCielabTexture;
 var cielabToSrgbShader;
 var cielabToSrgbTexture;
+var phongTexture;
 var mvMatrix = mat4.create();
 var pMatrix = mat4.create();
 var normalMatrix = mat3.create();
@@ -32,15 +34,15 @@ var drawOutlines = true;
 var transVal = 12.0;
 
 function screenBufferWidth() {
-	return 128;
+	return 256;
 }
 
 function screenBufferHeight() {
-	return 128;
+	return 256;
 }
 
 function areShadersLoaded() {
-	return basicShader.loaded && textureShader.loaded && pixelShader.loaded && /*normalShader.loaded && */depthShader.loaded && /*sobelShader.loaded && cannyShader.loaded && */directedNormalShader.loaded && outlineShader.loaded;
+	return basicShader.loaded && textureShader.loaded && phongShader.loaded && pixelShader.loaded && /*normalShader.loaded && */depthShader.loaded && /*sobelShader.loaded && cannyShader.loaded && */directedNormalShader.loaded && outlineShader.loaded;
 }
 
 function initGL(canvas) {
@@ -153,22 +155,35 @@ function initRectBuffer() {
 	gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(rectCoords), gl.STATIC_DRAW);
 }
 
+function initPhongShader() {
+	phongShader = createShaderFromFiles("phong.vs", "phong.fs");
+	phongShader.onLink = function() {
+		gl.useProgram(phongShader);
+		phongShader.vertexPosition = gl.getAttribLocation(phongShader, "vertexPosition");
+		phongShader.vertexNormal = gl.getAttribLocation(phongShader, "vertexNormal");
+		phongShader.texCoord = gl.getAttribLocation(phongShader, "texCoord");
+		phongShader.texture = gl.getUniformLocation(phongShader, "texture");
+		phongShader.pMatrix = gl.getUniformLocation(phongShader, "pMatrix");
+		phongShader.mvMatrix = gl.getUniformLocation(phongShader, "mvMatrix");
+		phongShader.nMatrix = gl.getUniformLocation(phongShader, "nMatrix");
+		phongShader.loaded = true;
+	}
+}
+
 function initPixelShader() {
 	pixelShader = createShaderFromFiles("pixel.vs", "pixel.fs");
 	pixelShader.onLink = function() {
 		gl.useProgram(pixelShader);
 		pixelShader.vertexPosition = gl.getAttribLocation(pixelShader, "vertexPosition");
-		pixelShader.vertexNormal = gl.getAttribLocation(pixelShader, "vertexNormal");
 		pixelShader.texCoord = gl.getAttribLocation(pixelShader, "texCoord");
-		pixelShader.texture = gl.getUniformLocation(pixelShader, "texture");
+		pixelShader.pMatrix = gl.getUniformLocation(pixelShader, "pMatrix");
+		pixelShader.mvMatrix = gl.getUniformLocation(pixelShader, "mvMatrix");
+		pixelShader.phongTexture = gl.getUniformLocation(pixelShader, "phongTexture");
 		pixelShader.edgeTexture = gl.getUniformLocation(pixelShader, "edgeTexture");
 		pixelShader.textureSize = gl.getUniformLocation(pixelShader, "textureSize");
 		pixelShader.palette = gl.getUniformLocation(pixelShader, "palette");
-		pixelShader.pMatrix = gl.getUniformLocation(pixelShader, "pMatrix");
-		pixelShader.mvMatrix = gl.getUniformLocation(pixelShader, "mvMatrix");
-		pixelShader.nMatrix = gl.getUniformLocation(pixelShader, "nMatrix");
 		pixelShader.rgbConversion = gl.getUniformLocation(pixelShader, "rgbConversion");
-		pixelShader.rgbConversionMatrix = mat3.create([0.4124, 0.3576, 0.1805, 0.2126, 0.7152, 0.0722, 0.0193, 0.1192, 0.9502]);
+		pixelShader.rgbConversionMatrix = mat3.create([0.4124, 0.3576, 0.1805, 0.2126, 0.7152, 0.0722, 0.0193, 0.1192, 0.9505]);
 		gl.uniformMatrix3fv(pixelShader.rgbConversion, false, pixelShader.rgbConversionMatrix);
 		pixelShader.loaded = true;
 	}
@@ -190,7 +205,6 @@ function initTextureShader() {
 	textureShader.onLink = function() {
 		gl.useProgram(textureShader);
 		textureShader.vertexPosition = gl.getAttribLocation(textureShader, "vertexPosition");
-		gl.enableVertexAttribArray(textureShader.texCoord);
 		textureShader.texCoord = gl.getAttribLocation(textureShader, "texCoord");
 		textureShader.pMatrix = gl.getUniformLocation(textureShader, "pMatrix");
 		textureShader.mvMatrix = gl.getUniformLocation(textureShader, "mvMatrix");
@@ -245,9 +259,7 @@ function initSobelShader() {
 	sobelShader.onLink = function() {
 		gl.useProgram(sobelShader);
 		sobelShader.vertexPosition = gl.getAttribLocation(sobelShader, "vertexPosition");
-		gl.enableVertexAttribArray(sobelShader.vertexPosition);
 		sobelShader.texCoord = gl.getAttribLocation(sobelShader, "texCoord");
-		gl.enableVertexAttribArray(sobelShader.texCoord);
 		sobelShader.pMatrix = gl.getUniformLocation(sobelShader, "pMatrix");
 		sobelShader.mvMatrix = gl.getUniformLocation(sobelShader, "mvMatrix");
 		sobelShader.inputImage = gl.getUniformLocation(sobelShader, "inputImage");
@@ -261,9 +273,7 @@ function initCannyShader() {
 	cannyShader.onLink = function() {
 		gl.useProgram(cannyShader);
 		cannyShader.vertexPosition = gl.getAttribLocation(cannyShader, "vertexPosition");
-		gl.enableVertexAttribArray(cannyShader.vertexPosition);
 		cannyShader.texCoord = gl.getAttribLocation(cannyShader, "texCoord");
-		gl.enableVertexAttribArray(cannyShader.texCoord);
 		cannyShader.pMatrix = gl.getUniformLocation(cannyShader, "pMatrix");
 		cannyShader.mvMatrix = gl.getUniformLocation(cannyShader, "mvMatrix");
 		cannyShader.depthTexture = gl.getUniformLocation(cannyShader, "depthTexture");
@@ -278,9 +288,7 @@ function initOutlineShader() {
 	outlineShader.onLink = function() {
 		gl.useProgram(outlineShader);
 		outlineShader.vertexPosition = gl.getAttribLocation(outlineShader, "vertexPosition");
-		gl.enableVertexAttribArray(outlineShader.vertexPosition);
 		outlineShader.texCoord = gl.getAttribLocation(outlineShader, "texCoord");
-		gl.enableVertexAttribArray(outlineShader.texCoord);
 		outlineShader.pMatrix = gl.getUniformLocation(outlineShader, "pMatrix");
 		outlineShader.mvMatrix = gl.getUniformLocation(outlineShader, "mvMatrix");
 		outlineShader.depthTexture = gl.getUniformLocation(outlineShader, "depthTexture");
@@ -295,12 +303,10 @@ function initSrgbToCielabShader() {
 	srgbToCielabShader.onLink = function() {
 		gl.useProgram(srgbToCielabShader);
 		srgbToCielabShader.vertexPosition = gl.getAttribLocation(srgbToCielabShader, "vertexPosition");
-		gl.enableVertexAttribArray(srgbToCielabShader.vertexPosition);
 		srgbToCielabShader.pMatrix = gl.getUniformLocation(srgbToCielabShader, "pMatrix");
 		srgbToCielabShader.mvMatrix = gl.getUniformLocation(srgbToCielabShader, "mvMatrix");
 		srgbToCielabShader.conversionMatrix = mat3.create([2.7688, 1.7517, 1.1301, 1.0, 4.5906, 0.060067, 0.0, 0.056507, 5.5942]);
 		srgbToCielabShader.rgbConversion = gl.getUniformLocation(srgbToCielabShader, "rgbConversion");
-		gl.disableVertexAttribArray(srgbToCielabShader.vertexPosition);
 		srgbToCielabShader.loaded = true;
 	}
 }
@@ -310,12 +316,10 @@ function initCielabToSrgbShader() {
 	srgbToCielabShader.onLink = function() {
 		gl.useProgram(cielabToSrgbShader);
 		cielabToSrgbShader.vertexPosition = gl.getAttribLocation(cielabToSrgbShader, "vertexPosition");
-		gl.enableVertexAttribArray(cielabToSrgbShader.vertexPosition);
 		cielabToSrgbShader.pMatrix = gl.getUniformLocation(cielabToSrgbShader, "pMatrix");
 		cielabToSrgbShader.mvMatrix = gl.getUniformLocation(cielabToSrgbShader, "mvMatrix");
 		cielabToSrgbShader.conversionMatrix = mat3.create([0.41847, -0.15866, -0.082835, -0.91169, 0.25243, 0.015708, 0.00092090, -0.0025498, 0.17860]);
 		cielabToSrgbShader.xyzConversion = gl.getUniformLocation(cielabToSrgbShader, "xyzConversion");
-		gl.disableVertexAttribArray(cielabToSrgbShader.vertexPosition);
 		cielabToSrgbShader.loaded = true;
 	}
 }
@@ -603,11 +607,6 @@ function drawModel(shader, model) {
 		gl.bindTexture(gl.TEXTURE_2D, model.texture);
 		gl.uniform1i(shader.texture, 0);
 	}
-	if (typeof shader.texture != "undefined") {
-		gl.activeTexture(gl.TEXTURE1);
-		gl.bindTexture(gl.TEXTURE_2D, model.palette);
-		gl.uniform1i(shader.palette, 1);
-	}
 	gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, model.indexBuffer);
 	gl.drawElements(gl.TRIANGLES, model.indexBuffer.numItems, gl.UNSIGNED_SHORT, 0);
 	gl.disableVertexAttribArray(shader.vertexPosition);
@@ -632,15 +631,11 @@ function draw() {
 		//gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 	}
 	gl.bindFramebuffer(gl.FRAMEBUFFER, screenFramebuffer);
-	gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, screenTexture, 0);
+	gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, phongTexture, 0);
+	
 	gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-	gl.useProgram(pixelShader);
-	gl.activeTexture(gl.TEXTURE2);
-	gl.bindTexture(gl.TEXTURE_2D, edgeTexture);
-	gl.uniform1i(pixelShader.edgeTexture, 2);
-	gl.uniform2i(pixelShader.textureSize, screenBufferWidth(), screenBufferHeight());
-	gl.activeTexture(gl.TEXTURE0);
-	drawModel(pixelShader, teapotModel);
+	drawModel(phongShader, teapotModel);
+	
 	/*if (drawOutlines) {
 		gl.disable(gl.DEPTH_TEST);
 		gl.enable(gl.BLEND);
@@ -651,6 +646,26 @@ function draw() {
 		gl.enable(gl.DEPTH_TEST);
 		gl.disable(gl.BLEND);
 	}*/
+	
+	
+	gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, screenTexture, 0);
+	
+	gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+	gl.useProgram(pixelShader);
+	gl.uniform2i(pixelShader.textureSize, screenBufferWidth(), screenBufferHeight());
+	gl.activeTexture(gl.TEXTURE0);
+	gl.bindTexture(gl.TEXTURE_2D, phongTexture);
+	gl.uniform1i(pixelShader.phongTexture, 0);
+	gl.activeTexture(gl.TEXTURE1);
+	gl.bindTexture(gl.TEXTURE_2D, edgeTexture);
+	gl.uniform1i(pixelShader.edgeTexture, 1);
+	gl.activeTexture(gl.TEXTURE2);
+	gl.bindTexture(gl.TEXTURE_2D, teapotModel.palette);
+	gl.uniform1i(pixelShader.palette, 2);
+	
+	drawRectangle(pixelShader);
+	gl.activeTexture(gl.TEXTURE0);
+	
 	gl.bindFramebuffer(gl.FRAMEBUFFER, null);
 	gl.viewport((stereoscopic && transVal < 0) ? gl.viewportWidth : 0, 0, gl.viewportWidth, gl.viewportHeight);
 	gl.bindTexture(gl.TEXTURE_2D, screenTexture);
@@ -680,6 +695,7 @@ function tick() {
 }
 
 function loadShaders() {
+	initPhongShader();
 	initPixelShader();
 	initBasicShader();
 	initDepthShader();
@@ -702,6 +718,7 @@ function start() {
 	edgeTexture = setupScreenTexture();
 	screenTexture = setupScreenTexture();
 	depthTexture = setupScreenTexture();
+	phongTexture = setupScreenTexture();
 	initScreenFramebuffer();
 	loadModel("teapot2.ply", teapotModel);
 	loadTexture("texture3.png", teapotModel);
