@@ -13,6 +13,8 @@ uniform mat3 rgbConversion;
 #define PI 3.141592653589793238462643383279
 
 const float ditherFactor = 0.06;
+const float antialiasThreshold = 0.1;
+const int antialiasDistance = 16;
 
 float linearise(float c) {
 	if (c <= 0.04045) {
@@ -99,6 +101,66 @@ vec3 srgbToCielab(vec3 srgb) {
 	return cielab;
 }
 
+vec4 antialiasHorizontal() {
+	vec2 lcoord = gl_FragCoord.xy / vec2(textureSize);
+	vec2 rcoord = gl_FragCoord.xy / vec2(textureSize);
+	float offset = 1.0 / float(textureSize.x);
+	bool lfound = false;
+	bool rfound = false;
+	for (int i = 0; i < antialiasDistance; i++) {
+		if (!lfound) {
+			lcoord.x -= offset;
+			lfound = (texture2D(edgeTexture, lcoord).r < antialiasThreshold);
+		}
+		if (!rfound) {
+			rcoord.x += offset;
+			rfound = (texture2D(edgeTexture, rcoord).r < antialiasThreshold);
+		}
+		if (rfound && lfound) {
+			break;
+		}
+	}
+	float len = (rcoord.x - lcoord.x - offset);
+	float weighting = (gl_FragCoord.x / float(textureSize.x) - lcoord.x) / len;
+	return 0.6 * (texture2D(phongTexture, lcoord) * (1.0 - weighting) + texture2D(phongTexture, rcoord) * weighting);
+}
+
+vec4 antialiasVertical() {
+	vec2 dcoord = gl_FragCoord.xy / vec2(textureSize);
+	vec2 ucoord = gl_FragCoord.xy / vec2(textureSize);
+	float offset = 1.0 / float(textureSize.y);
+	bool dfound = false;
+	bool ufound = false;
+	for (int i = 0; i < antialiasDistance; i++) {
+		if (!dfound) {
+			dcoord.y -= offset;
+			dfound = (texture2D(edgeTexture, dcoord).r < antialiasThreshold);
+		}
+		if (!ufound) {
+			ucoord.y += offset;
+			ufound = (texture2D(edgeTexture, ucoord).r < antialiasThreshold);
+		}
+		if (dfound && ufound) {
+			break;
+		}
+	}
+	float len = (ucoord.y - dcoord.y - offset);
+	float weighting = (gl_FragCoord.y / float(textureSize.y) - dcoord.y) / len;
+	return 0.6 * (texture2D(phongTexture, dcoord) * (1.0 - weighting) + texture2D(phongTexture, ucoord) * weighting);
+}
+
+vec4 antialias() {
+	float leftIntensity = texture2D(edgeTexture, (gl_FragCoord.xy - vec2(1.0, 0.0)) / vec2(textureSize)).r;
+	float rightIntensity = texture2D(edgeTexture, (gl_FragCoord.xy + vec2(1.0, 0.0)) / vec2(textureSize)).r;
+	float downIntensity = texture2D(edgeTexture, (gl_FragCoord.xy + vec2(0.0, 1.0)) / vec2(textureSize)).r;
+	float upIntensity = texture2D(edgeTexture, (gl_FragCoord.xy - vec2(0.0, 1.0)) / vec2(textureSize)).r;
+	if ((leftIntensity + rightIntensity) > (downIntensity + upIntensity)) {
+		return antialiasHorizontal();
+	} else {
+		return antialiasVertical();
+	}
+}
+
 vec4 getMatchingColour(vec4 colour) {
 	float bestDist = -1.0;
 	vec4 bestColour;
@@ -118,8 +180,13 @@ vec4 getMatchingColour(vec4 colour) {
 void main(void) {
 	vec4 fragColour = texture2D(phongTexture, gl_FragCoord.xy / vec2(textureSize));
 	float specularFactor = fragColour.a;
-	vec4 edgeIntensity = texture2D(edgeTexture, gl_FragCoord.xy / vec2(textureSize));
-	fragColour = (fragColour + vec4(vec3(specularFactor), 1.0) * (1.0 - edgeIntensity)) * (1.0 - 0.8 * edgeIntensity);
+	float edgeIntensity = texture2D(edgeTexture, gl_FragCoord.xy / vec2(textureSize)).r;
+	if (edgeIntensity > antialiasThreshold) {
+		fragColour = fragColour * (1.0 - edgeIntensity) + antialias() * edgeIntensity;
+		//fragColour = antialias();
+	} else {
+		fragColour = fragColour + vec4(vec3(specularFactor), 1.0);
+	}
 	fragColour.a = 1.0;
 	fragColour = clamp(fragColour, 0.0, 1.0);
 	// LET'S DITHER SOME THINGS

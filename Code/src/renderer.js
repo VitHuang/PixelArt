@@ -34,11 +34,11 @@ var drawOutlines = true;
 var transVal = 12.0;
 
 function screenBufferWidth() {
-	return 256;
+	return 128;
 }
 
 function screenBufferHeight() {
-	return 256;
+	return 128;
 }
 
 function areShadersLoaded() {
@@ -722,7 +722,7 @@ function start() {
 	initScreenFramebuffer();
 	loadModel("teapot2.ply", teapotModel);
 	loadTexture("texture3.png", teapotModel);
-	gl.clearColor(1.0, 1.0, 1.0, 1.0);
+	gl.clearColor(0.0, 0.0, 0.0, 1.0);
 	gl.enable(gl.DEPTH_TEST);
 	gl.depthFunc(gl.LEQUAL);
 	tick();
