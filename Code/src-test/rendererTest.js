@@ -41,6 +41,12 @@ fragmentTestSuite('pixel shader', loadScriptFile('pixel.fs'), function() {
 	  .equal([0.9505, 1.0, 1.089])
 	  .withEpsilonOf(0.0001);
   });
+  testMain('Test SRGB pink to CIEXYZ', function() {
+    set('rgbConversion').asArray(rgbConversionMatrix);
+    expect('srgbToCiexyz(vec3(1.0, 0.53333, 0.53333))')
+	  .equal([0.54488, 0.40646, 0.28266])
+	  .withEpsilonOf(0.00001);
+  });
   testMain('Test SRGB black to CIELab', function() {
     set('rgbConversion').asArray(rgbConversionMatrix);
     expect('srgbToCielab(vec3(0.0, 0.0, 0.0))')
@@ -53,17 +59,47 @@ fragmentTestSuite('pixel shader', loadScriptFile('pixel.fs'), function() {
 	  .equal([100.0, 0.0053, -0.0104])
 	  .withEpsilonOf(0.0001);
   });
+  testMain('Test SRGB red to CIELab', function() {
+    set('rgbConversion').asArray(rgbConversionMatrix);
+    expect('srgbToCielab(vec3(1.0, 0.0, 0.0))')
+	  .equal([53.2329, 80.1093, 67.2201])
+	  .withEpsilonOf(0.0001);
+  });
+  testMain('Test SRGB green to CIELab', function() {
+    set('rgbConversion').asArray(rgbConversionMatrix);
+    expect('srgbToCielab(vec3(0.0, 1.0, 0.0))')
+	  .equal([87.7370, -86.1846, 83.1812])
+	  .withEpsilonOf(0.0001);
+  });
   testMain('Test SRGB pink to CIELab', function() {
     set('rgbConversion').asArray(rgbConversionMatrix);
     expect('srgbToCielab(vec3(1.0, 0.368627, 0.368627))')
 	  .equal([61.718, 61.134, 33.283])
 	  .withEpsilonOf(0.001);
   });
-  testMain('Test SRGB pink to CIEXYZ', function() {
+  testMain('Test CIEDE2000 white-black', function() {
     set('rgbConversion').asArray(rgbConversionMatrix);
-    expect('srgbToCiexyz(vec3(1.0, 0.53333, 0.53333))')
-	  .equal([0.54488, 0.40646, 0.28266])
-	  .withEpsilonOf(0.00001);
+    expect('ciede2000(srgbToCielab(vec3(1.0, 1.0, 1.0)), srgbToCielab(vec3(0.0, 0.0, 0.0)))')
+	  .equal(100.0)
+	  .withEpsilonOf(0.0001);
+  });
+  testMain('Test CIEDE2000 pink-red', function() {
+    set('rgbConversion').asArray(rgbConversionMatrix);
+    expect('ciede2000(srgbToCielab(vec3(1.0, 0.368627, 0.368627)), srgbToCielab(vec3(1.0, 0.0, 0.0)))')
+	  .equal(13.5348)
+	  .withEpsilonOf(0.0020);
+  });
+  testMain('Test CIEDE2000 red-green', function() {
+    set('rgbConversion').asArray(rgbConversionMatrix);
+    expect('ciede2000(srgbToCielab(vec3(1.0, 0.0, 0.0)), srgbToCielab(vec3(0.0, 1.0, 0.0)))')
+	  .equal(86.615)
+	  .withEpsilonOf(0.0090);
+  });
+  testMain('Test CIEDE2000', function() {
+    set('rgbConversion').asArray(rgbConversionMatrix);
+    expect('ciede2000(vec3(50.0, 2.6772, -79.7751), vec3(50.0, 0.0, -82.7485))')
+	  .equal(2.0425)
+	  .withEpsilonOf(0.0003); // quite a lot of floating point error
   });
   // TODO: figure out how as2DTexture works, because it doesn't seem to.
   /*testMain('Test closest colour', function() {

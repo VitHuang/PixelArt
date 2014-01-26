@@ -5,16 +5,10 @@ var textureShader;
 var phongShader;
 var pixelShader;
 var normalShader;
-var directedNormalShader;
 var depthShader;
-var sobelShader;
-var cannyShader;
 var outlineShader;
+var ciede2000Shader;
 var conversionFramebuffer;
-var srgbToCielabShader;
-var srgbToCielabTexture;
-var cielabToSrgbShader;
-var cielabToSrgbTexture;
 var phongTexture;
 var mvMatrix = mat4.create();
 var pMatrix = mat4.create();
@@ -23,12 +17,12 @@ var teapotModel = new Object;
 var screenFramebuffer;
 var normalTexture;
 var depthTexture;
-var normalSobelTexture;
-var depthSobelTexture;
 var edgeTexture;
 var screenTexture;
+var ciede2000Texture;
 var rectBuffer;
 var loadedShaders = false;
+var loadedPalette = false;
 var stereoscopic = false;
 var drawOutlines = true;
 var transVal = 12.0;
@@ -42,7 +36,7 @@ function screenBufferHeight() {
 }
 
 function areShadersLoaded() {
-	return basicShader.loaded && textureShader.loaded && phongShader.loaded && pixelShader.loaded && /*normalShader.loaded && */depthShader.loaded && /*sobelShader.loaded && cannyShader.loaded && */directedNormalShader.loaded && outlineShader.loaded;
+	return basicShader.loaded && textureShader.loaded && phongShader.loaded && pixelShader.loaded && depthShader.loaded && normalShader.loaded && outlineShader.loaded && ciede2000Shader.loaded;
 }
 
 function initGL(canvas) {
@@ -180,6 +174,8 @@ function initPixelShader() {
 		pixelShader.mvMatrix = gl.getUniformLocation(pixelShader, "mvMatrix");
 		pixelShader.phongTexture = gl.getUniformLocation(pixelShader, "phongTexture");
 		pixelShader.edgeTexture = gl.getUniformLocation(pixelShader, "edgeTexture");
+		pixelShader.depthTexture = gl.getUniformLocation(pixelShader, "depthTexture");
+		pixelShader.conversionTexture = gl.getUniformLocation(pixelShader, "conversionTexture");
 		pixelShader.textureSize = gl.getUniformLocation(pixelShader, "textureSize");
 		pixelShader.palette = gl.getUniformLocation(pixelShader, "palette");
 		pixelShader.rgbConversion = gl.getUniformLocation(pixelShader, "rgbConversion");
@@ -214,7 +210,7 @@ function initTextureShader() {
 }
 
 function initNormalShader() {
-	normalShader = createShaderFromFiles("normal.vs", "normal.fs");
+	normalShader = createShaderFromFiles("directednormal.vs", "directednormal.fs");
 	normalShader.onLink = function() {
 		gl.useProgram(normalShader);
 		normalShader.vertexPosition = gl.getAttribLocation(normalShader, "vertexPosition");
@@ -223,19 +219,6 @@ function initNormalShader() {
 		normalShader.mvMatrix = gl.getUniformLocation(normalShader, "mvMatrix");
 		normalShader.nMatrix = gl.getUniformLocation(normalShader, "nMatrix");
 		normalShader.loaded = true;
-	}
-}
-
-function initDirectedNormalShader() {
-	directedNormalShader = createShaderFromFiles("directednormal.vs", "directednormal.fs");
-	directedNormalShader.onLink = function() {
-		gl.useProgram(directedNormalShader);
-		directedNormalShader.vertexPosition = gl.getAttribLocation(directedNormalShader, "vertexPosition");
-		directedNormalShader.vertexNormal = gl.getAttribLocation(directedNormalShader, "vertexNormal");
-		directedNormalShader.pMatrix = gl.getUniformLocation(directedNormalShader, "pMatrix");
-		directedNormalShader.mvMatrix = gl.getUniformLocation(directedNormalShader, "mvMatrix");
-		directedNormalShader.nMatrix = gl.getUniformLocation(directedNormalShader, "nMatrix");
-		directedNormalShader.loaded = true;
 	}
 }
 
@@ -254,35 +237,6 @@ function initDepthShader() {
 	}
 }
 
-function initSobelShader() {
-	sobelShader = createShaderFromFiles("sobel.vs", "sobel.fs");
-	sobelShader.onLink = function() {
-		gl.useProgram(sobelShader);
-		sobelShader.vertexPosition = gl.getAttribLocation(sobelShader, "vertexPosition");
-		sobelShader.texCoord = gl.getAttribLocation(sobelShader, "texCoord");
-		sobelShader.pMatrix = gl.getUniformLocation(sobelShader, "pMatrix");
-		sobelShader.mvMatrix = gl.getUniformLocation(sobelShader, "mvMatrix");
-		sobelShader.inputImage = gl.getUniformLocation(sobelShader, "inputImage");
-		sobelShader.imageSize = gl.getUniformLocation(sobelShader, "imageSize");
-		sobelShader.loaded = true;
-	}
-}
-
-function initCannyShader() {
-	cannyShader = createShaderFromFiles("canny.vs", "canny.fs");
-	cannyShader.onLink = function() {
-		gl.useProgram(cannyShader);
-		cannyShader.vertexPosition = gl.getAttribLocation(cannyShader, "vertexPosition");
-		cannyShader.texCoord = gl.getAttribLocation(cannyShader, "texCoord");
-		cannyShader.pMatrix = gl.getUniformLocation(cannyShader, "pMatrix");
-		cannyShader.mvMatrix = gl.getUniformLocation(cannyShader, "mvMatrix");
-		cannyShader.depthTexture = gl.getUniformLocation(cannyShader, "depthTexture");
-		cannyShader.normalTexture = gl.getUniformLocation(cannyShader, "normalTexture");
-		cannyShader.textureSize = gl.getUniformLocation(cannyShader, "textureSize");
-		cannyShader.loaded = true;
-	}
-}
-
 function initOutlineShader() {
 	outlineShader = createShaderFromFiles("outline.vs", "outline.fs");
 	outlineShader.onLink = function() {
@@ -298,29 +252,19 @@ function initOutlineShader() {
 	}
 }
 
-function initSrgbToCielabShader() {
-	srgbToCielabShader = createShaderFromFiles("canny.vs", "srgbtocielab.fs");
-	srgbToCielabShader.onLink = function() {
-		gl.useProgram(srgbToCielabShader);
-		srgbToCielabShader.vertexPosition = gl.getAttribLocation(srgbToCielabShader, "vertexPosition");
-		srgbToCielabShader.pMatrix = gl.getUniformLocation(srgbToCielabShader, "pMatrix");
-		srgbToCielabShader.mvMatrix = gl.getUniformLocation(srgbToCielabShader, "mvMatrix");
-		srgbToCielabShader.conversionMatrix = mat3.create([2.7688, 1.7517, 1.1301, 1.0, 4.5906, 0.060067, 0.0, 0.056507, 5.5942]);
-		srgbToCielabShader.rgbConversion = gl.getUniformLocation(srgbToCielabShader, "rgbConversion");
-		srgbToCielabShader.loaded = true;
-	}
-}
-
-function initCielabToSrgbShader() {
-	srgbToCielabShader = createShaderFromFiles("canny.vs", "cielabtosrgb.fs");
-	srgbToCielabShader.onLink = function() {
-		gl.useProgram(cielabToSrgbShader);
-		cielabToSrgbShader.vertexPosition = gl.getAttribLocation(cielabToSrgbShader, "vertexPosition");
-		cielabToSrgbShader.pMatrix = gl.getUniformLocation(cielabToSrgbShader, "pMatrix");
-		cielabToSrgbShader.mvMatrix = gl.getUniformLocation(cielabToSrgbShader, "mvMatrix");
-		cielabToSrgbShader.conversionMatrix = mat3.create([0.41847, -0.15866, -0.082835, -0.91169, 0.25243, 0.015708, 0.00092090, -0.0025498, 0.17860]);
-		cielabToSrgbShader.xyzConversion = gl.getUniformLocation(cielabToSrgbShader, "xyzConversion");
-		cielabToSrgbShader.loaded = true;
+function initCiede2000Shader() {
+	ciede2000Shader = createShaderFromFiles("ciede2000.vs", "ciede2000.fs");
+	ciede2000Shader.onLink = function() {
+		gl.useProgram(ciede2000Shader);
+		ciede2000Shader.vertexPosition = gl.getAttribLocation(ciede2000Shader, "vertexPosition");
+		ciede2000Shader.texCoord = gl.getAttribLocation(ciede2000Shader, "texCoord");
+		ciede2000Shader.pMatrix = gl.getUniformLocation(ciede2000Shader, "pMatrix");
+		ciede2000Shader.mvMatrix = gl.getUniformLocation(ciede2000Shader, "mvMatrix");
+		ciede2000Shader.palette = gl.getUniformLocation(ciede2000Shader, "palette");
+		ciede2000Shader.rgbConversion = gl.getUniformLocation(ciede2000Shader, "rgbConversion");
+		ciede2000Shader.rgbConversionMatrix = mat3.create([0.4124, 0.3576, 0.1805, 0.2126, 0.7152, 0.0722, 0.0193, 0.1192, 0.9505]);
+		gl.uniformMatrix3fv(ciede2000Shader.rgbConversion, false, ciede2000Shader.rgbConversionMatrix);
+		ciede2000Shader.loaded = true;
 	}
 }
 
@@ -348,22 +292,30 @@ function setupScreenTexture(scale) {
 	gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, screenBufferWidth() * scale, screenBufferHeight() * scale, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
 	gl.bindTexture(gl.TEXTURE_2D, null);
 	return texture;
-}	
+}
 
-function createConversionTextures() {
-	conversionTexture = gl.createTexture();
+function createConversionTextures(palette) {
+	ciede2000Texture = gl.createTexture();
 	conversionFramebuffer = gl.createFramebuffer();
 	gl.bindFramebuffer(gl.FRAMEBUFFER, conversionFramebuffer);
-	gl.bindTexture(gl.TEXTURE_2D, conversionTexture);
+	gl.bindTexture(gl.TEXTURE_2D, ciede2000Texture);
 	gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
 	gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
-	gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 2048, 2048, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
-	var renderbuffer = gl.createRenderbuffer();
-	gl.bindRenderbuffer(gl.RENDERBUFFER, renderbuffer);
-	gl.renderbufferStorage(gl.RENDERBUFFER, gl.DEPTH_COMPONENT16, 2048, 2048);
-	gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, conversionTexture, 0);
-    gl.framebufferRenderbuffer(gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT, gl.RENDERBUFFER, renderbuffer);
-	drawRectangle(srgbToCielabShader);
+	gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 4096, 4096, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+	conversionFramebuffer = gl.createFramebuffer();
+	gl.bindFramebuffer(gl.FRAMEBUFFER, conversionFramebuffer);
+	gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, ciede2000Texture, 0);
+	//gl.disable(gl.DEPTH_TEST);
+	//gl.depthMask(gl.FALSE);
+	gl.viewport(0, 0, 4096, 4096);
+	gl.bindTexture(gl.TEXTURE_2D, palette);
+	gl.activeTexture(gl.TEXTURE0);
+	gl.uniform1i(ciede2000Shader.palette, 0);
+	drawRectangle(ciede2000Shader);
+	//gl.depthMask(gl.TRUE);
+	//gl.enable(gl.DEPTH_TEST);
+	gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+	gl.bindTexture(gl.TEXTURE_2D, null);
 }
 
 
@@ -474,16 +426,17 @@ function loadTexture(filename, model, palette) {
 		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
 		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
 		gl.bindTexture(gl.TEXTURE_2D, null);
+		loadedPalette = true;
 	}
 	model.palette.image.src = "palette3.png";
 }
 
-function renderOutlineNew(model) {
+function renderOutline(model) {
 	gl.bindFramebuffer(gl.FRAMEBUFFER, screenFramebuffer);
 	
 	gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, normalTexture, 0);
 	gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-	drawModel(directedNormalShader, model);
+	drawModel(normalShader, model);
 	
 	gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, depthTexture, 0);
 	gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
@@ -502,52 +455,6 @@ function renderOutlineNew(model) {
 	gl.activeTexture(gl.TEXTURE0);
 	gl.uniform2i(outlineShader.textureSize, screenBufferWidth(), screenBufferHeight());
 	drawRectangle(outlineShader);
-	
-	gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, screenTexture, 0);
-	gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-}
-
-
-function renderOutline(model) {
-	gl.bindFramebuffer(gl.FRAMEBUFFER, screenFramebuffer);
-	
-	gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, normalTexture, 0);
-	gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-	drawModel(normalShader, model);
-	
-	gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, depthTexture, 0);
-	gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-	gl.useProgram(depthShader);
-	drawModel(depthShader, model);
-	
-	gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, normalSobelTexture, 0);
-	gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-	gl.useProgram(sobelShader);
-	gl.bindTexture(gl.TEXTURE_2D, normalTexture);
-	gl.uniform1i(sobelShader.inputImage, 0);
-	gl.uniform2i(sobelShader.imageSize, screenBufferWidth(), screenBufferHeight());
-	drawRectangle(sobelShader);
-	
-	gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, depthSobelTexture, 0);
-	gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-	gl.useProgram(sobelShader);
-	gl.bindTexture(gl.TEXTURE_2D, depthTexture);
-	gl.uniform1i(sobelShader.inputImage, 0);
-	gl.uniform2i(sobelShader.imageSize, screenBufferWidth(), screenBufferHeight());
-	drawRectangle(sobelShader);
-	
-	gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, edgeTexture, 0);
-	gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-	gl.useProgram(cannyShader);
-	gl.activeTexture(gl.TEXTURE0);
-	gl.bindTexture(gl.TEXTURE_2D, depthSobelTexture);
-	gl.uniform1i(cannyShader.depthTexture, 0);
-	gl.activeTexture(gl.TEXTURE1);
-	gl.bindTexture(gl.TEXTURE_2D, normalSobelTexture);
-	gl.uniform1i(cannyShader.normalTexture, 1);
-	gl.activeTexture(gl.TEXTURE0);
-	gl.uniform2i(cannyShader.textureSize, screenBufferWidth(), screenBufferHeight());
-	drawRectangle(cannyShader);
 	
 	gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, screenTexture, 0);
 	gl.bindFramebuffer(gl.FRAMEBUFFER, null);
@@ -627,26 +534,13 @@ function draw() {
 	}
 	gl.viewport(0, 0, screenBufferWidth(), screenBufferHeight());
 	if (drawOutlines) {
-		renderOutlineNew(teapotModel);
-		//gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+		renderOutline(teapotModel);
 	}
 	gl.bindFramebuffer(gl.FRAMEBUFFER, screenFramebuffer);
 	gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, phongTexture, 0);
 	
 	gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 	drawModel(phongShader, teapotModel);
-	
-	/*if (drawOutlines) {
-		gl.disable(gl.DEPTH_TEST);
-		gl.enable(gl.BLEND);
-		gl.blendFunc(gl.ZERO, gl.SRC_COLOR);
-		gl.bindTexture(gl.TEXTURE_2D, edgeTexture);
-		gl.useProgram(textureShader);
-		drawRectangle(textureShader);
-		gl.enable(gl.DEPTH_TEST);
-		gl.disable(gl.BLEND);
-	}*/
-	
 	
 	gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, screenTexture, 0);
 	
@@ -660,8 +554,14 @@ function draw() {
 	gl.bindTexture(gl.TEXTURE_2D, edgeTexture);
 	gl.uniform1i(pixelShader.edgeTexture, 1);
 	gl.activeTexture(gl.TEXTURE2);
+	gl.bindTexture(gl.TEXTURE_2D, depthTexture);
+	gl.uniform1i(pixelShader.depthTexture, 2);
+	gl.activeTexture(gl.TEXTURE3);
+	gl.bindTexture(gl.TEXTURE_2D, ciede2000Texture);
+	gl.uniform1i(pixelShader.conversionTexture, 3);
+	gl.activeTexture(gl.TEXTURE4);
 	gl.bindTexture(gl.TEXTURE_2D, teapotModel.palette);
-	gl.uniform1i(pixelShader.palette, 2);
+	gl.uniform1i(pixelShader.palette, 4);
 	
 	drawRectangle(pixelShader);
 	gl.activeTexture(gl.TEXTURE0);
@@ -685,6 +585,9 @@ function testOutline() {
 }
 
 function tick() {
+	if (!ciede2000Texture && ciede2000Shader.loaded && loadedPalette) {
+		createConversionTextures(teapotModel.palette);
+	}
 	requestAnimFrame(tick);
 	draw();
 	if (stereoscopic) {
@@ -699,12 +602,10 @@ function loadShaders() {
 	initPixelShader();
 	initBasicShader();
 	initDepthShader();
-	//initNormalShader();
-	//initSobelShader();
-	//initCannyShader();
-	initDirectedNormalShader();
+	initNormalShader();
 	initOutlineShader();
 	initTextureShader();
+	initCiede2000Shader();
 }
 
 function start() {
