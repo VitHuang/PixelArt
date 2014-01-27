@@ -6,18 +6,50 @@ uniform sampler2D phongTexture;
 uniform sampler2D edgeTexture;
 uniform sampler2D depthTexture;
 uniform sampler2D conversionTexture;
+uniform mat3 rgbConversion;
 uniform ivec2 textureSize;
 
 const int conversionBits = 8;
 const float ditherFactor = 0.06;
-const float antialiasThreshold = 0.1;
+const float edgeThreshold = 0.3;
 const int antialiasDistance = 16;
-const vec4 outlineColour = vec4(0.3, 0.3, 0.3, 1.0);
-const vec4 edgeColour = vec4(0.6, 0.6, 0.6, 1.0);
+const vec4 outlineColour = vec4(0.5, 0.5, 0.5, 1.0);
+const vec4 edgeColour = vec4(0.8, 0.8, 0.8, 1.0);
 
 float unpack(vec4 pack) {
 	const vec4 shifts = vec4(1.0 / (256.0 * 256.0 * 256.0), 1.0 / (256.0 * 256.0), 1.0 / 256.0, 1.0);
 	return dot(pack, shifts);
+}
+
+
+float linearise(float c) {
+	if (c <= 0.04045) {
+		return (c / 12.92);
+	} else {
+		return pow((c + 0.055) / 1.055, 2.4);
+	}
+}
+
+float labf(float c) {
+	if (c > 0.008856) {
+		return pow(c, 1.0/3.0);
+	} else {
+		return 7.787 * c + 0.1379;
+	}
+}
+
+vec3 srgbToCiexyz(vec3 srgb) {
+	vec3 linearRgb = vec3(linearise(srgb.r), linearise(srgb.g), linearise(srgb.b));
+	return linearRgb * rgbConversion;
+}
+
+vec3 srgbToCielab(vec3 srgb) {
+	vec3 ciexyz = srgbToCiexyz(srgb);
+	float fX = labf(ciexyz.x / 0.95047);
+	float fY = labf(ciexyz.y);
+	float fZ = labf(ciexyz.z / 1.08883);
+	vec3 cielab = vec3(max(116.0 * fY - 16.0, 0.0), 500.0 * (fX - fY), 200.0 * (fY - fZ));
+	return cielab;
 }
 
 vec4 antialiasHorizontal() {
@@ -30,11 +62,11 @@ vec4 antialiasHorizontal() {
 	for (int i = 0; i < antialiasDistance; i++) {
 		if (!lfound) {
 			lcoord.x -= offset;
-			lfound = (texture2D(edgeTexture, lcoord).r < antialiasThreshold);
+			lfound = (texture2D(edgeTexture, lcoord).r < edgeThreshold);
 		}
 		if (!rfound) {
 			rcoord.x += offset;
-			rfound = (texture2D(edgeTexture, rcoord).r < antialiasThreshold);
+			rfound = (texture2D(edgeTexture, rcoord).r < edgeThreshold);
 		}
 		if (rfound && lfound) {
 			break;
@@ -70,11 +102,11 @@ vec4 antialiasVertical() {
 	for (int i = 0; i < antialiasDistance; i++) {
 		if (!dfound) {
 			dcoord.y -= offset;
-			dfound = (texture2D(edgeTexture, dcoord).r < antialiasThreshold);
+			dfound = (texture2D(edgeTexture, dcoord).r < edgeThreshold);
 		}
 		if (!ufound) {
 			ucoord.y += offset;
-			ufound = (texture2D(edgeTexture, ucoord).r < antialiasThreshold);
+			ufound = (texture2D(edgeTexture, ucoord).r < edgeThreshold);
 		}
 		if (dfound && ufound) {
 			break;
@@ -127,27 +159,63 @@ vec4 getMatchingColour(vec4 colour) {
 	return texture2D(conversionTexture, rgbToCoords(clamp(colour, 0.0, 1.0).rgb));
 }
 
+vec4 getEdgeColour(vec4 colour) {
+	vec2 coord = gl_FragCoord.xy / vec2(textureSize);
+	vec2 lcoord = coord - vec2(1.0 / float(textureSize.x), 0.0);
+	vec2 rcoord = coord + vec2(1.0 / float(textureSize.x), 0.0);
+	vec2 dcoord = coord - vec2(0.0, 1.0 / float(textureSize.y));
+	vec2 ucoord = coord + vec2(0.0, 1.0 / float(textureSize.y));
+	float ll = 1.0;
+	if (unpack(texture2D(depthTexture, lcoord)) < 1.0) {
+		ll = srgbToCielab(getMatchingColour(texture2D(phongTexture, lcoord)).rgb).x;
+	}
+	float rl = 1.0;
+	if (unpack(texture2D(depthTexture, rcoord)) < 1.0) {
+		rl = srgbToCielab(getMatchingColour(texture2D(phongTexture, rcoord)).rgb).x;
+	}
+	float dl = 1.0;
+	if (unpack(texture2D(depthTexture, dcoord)) < 1.0) {
+		dl = srgbToCielab(getMatchingColour(texture2D(phongTexture, dcoord)).rgb).x;
+	}
+	float ul = 1.0;
+	if (unpack(texture2D(depthTexture, ucoord)) < 1.0) {
+		ul = srgbToCielab(getMatchingColour(texture2D(phongTexture, ucoord)).rgb).x;
+	}
+	vec4 paletteColour = getMatchingColour(colour);
+	float l = srgbToCielab(paletteColour.rgb).x;
+	if (l >= ll || l >= rl || l >= dl || l >= ul) {
+		for (int i = 0; i < 10; i++) {
+			colour = colour * vec4(0.9, 0.9, 0.9, 1.0);
+			paletteColour = getMatchingColour(colour);
+			l = srgbToCielab(paletteColour.rgb).x;
+			if ((l < ll && l < rl && l < dl && l < ul) || length(colour.rgb) <= 0.1) {
+				break;
+			}
+		}
+	}
+	return paletteColour;
+}
+
 void main(void) {
 	vec4 fragColour = texture2D(phongTexture, gl_FragCoord.xy / vec2(textureSize));
 	float specularFactor = fragColour.a;
 	float edgeIntensity = texture2D(edgeTexture, gl_FragCoord.xy / vec2(textureSize)).r;
-	if (edgeIntensity > antialiasThreshold) {
+	if (edgeIntensity > edgeThreshold) {
 		if (specularFactor > 1.0) {
 			fragColour = fragColour * (1.0 - edgeIntensity) + edgeColour * edgeIntensity;
 		} else {
 			fragColour = fragColour * (1.0 - edgeIntensity) + antialias() * edgeIntensity;
-			}
-		//fragColour = antialias();
+		}
+		gl_FragColor = getEdgeColour(fragColour);
 	} else {
 		fragColour = fragColour + vec4(vec3(specularFactor), 1.0);
+		// LET'S DITHER SOME THINGS
+		//fragColour += (mod(gl_FragCoord[0] + gl_FragCoord[1], 2.0)) * ditherFactor * 2.0 - ditherFactor;
+		//fragColour += floor((mod(gl_FragCoord[0], 2.0) + mod(gl_FragCoord[1], 2.0)) / 2.0) * ditherFactor / 2.0;
+		//fragColour += floor((mod(gl_FragCoord[0] + 1.0, 2.0) + mod(gl_FragCoord[1], 2.0)) / 2.0) * -ditherFactor / 2.0;
+		//fragColour -= floor((2.0 - (mod(gl_FragCoord[0], 2.0) + mod(gl_FragCoord[1], 2.0))) / 2.0) * ditherFactor;
+		gl_FragColor = getMatchingColour(fragColour);
 	}
-	fragColour.a = 1.0;
-	// LET'S DITHER SOME THINGS
-	//fragColour += (mod(gl_FragCoord[0] + gl_FragCoord[1], 2.0)) * ditherFactor * 2.0 - ditherFactor;
-	//fragColour += floor((mod(gl_FragCoord[0], 2.0) + mod(gl_FragCoord[1], 2.0)) / 2.0) * ditherFactor / 2.0;
-	//fragColour += floor((mod(gl_FragCoord[0] + 1.0, 2.0) + mod(gl_FragCoord[1], 2.0)) / 2.0) * -ditherFactor / 2.0;
-	//fragColour -= floor((2.0 - (mod(gl_FragCoord[0], 2.0) + mod(gl_FragCoord[1], 2.0))) / 2.0) * ditherFactor;
 	//vec2 paletteMapIndex = vec2(floor(fragColour.r * 255.0) * 16.0 + floor(fragColour.g * 16.0), floor(fragColour.b * 255.0) * 16.0 + floor(mod(fragColour.g * 255.0, 16.0)));
-	gl_FragColor = getMatchingColour(fragColour);//texture2D(paletteMap, paletteMapIndex);
 	//gl_FragColor = fragColour;
 }
