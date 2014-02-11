@@ -6,8 +6,8 @@ uniform ivec2 textureSize;
 varying vec2 varTexCoord;
 
 const float normalThreshold = 0.1;
-
 const float minDepthThreshold = 0.01;
+const float depthFactor = 5.0;
 
 float unpack(vec4 pack) {
 	const vec4 shifts = vec4(1.0 / (256.0 * 256.0 * 256.0), 1.0 / (256.0 * 256.0), 1.0 / 256.0, 1.0);
@@ -36,10 +36,10 @@ float edgeIntensity(vec3 normal, float depth, vec2 other) {
 		}
 		float normalDistance = distance(normal, normalAt(other));
 		if (normalDistance > normalThreshold) {
-			float x = (normalDistance - normalThreshold) / (1.0 - normalThreshold);
+			float x = (normalDistance - normalThreshold) / (1.0 - normalThreshold) + depthDistance * depthFactor;
 			return x;//1.0 - ((1.0 - x) * (1.0 - x));
 		} else {
-			return 0.0;
+			return depthDistance * depthFactor;
 		}
 	} else {
 		return 0.0;

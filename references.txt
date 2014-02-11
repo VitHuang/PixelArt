@@ -12,3 +12,10 @@ Voronoi diagrams using graphics hardware: https://wwwx.cs.unc.edu/~geom/papers/d
 GPU-based Canny edge detection: http://www.prasa.org/proceedings/2007/prasa07-26.pdf
 
 CIEDE2000 colour difference: http://www.ece.rochester.edu/~gsharma/ciede2000/ciede2000noteCRNA.pdf
+
+Kaufman, L. and Rousseeuw, P.J. (1987), Clustering by means of Medoids, in Statistical Data Analysis Based on the L_{1}–Norm and Related Methods, edited by Y. Dodge, North-Holland, 405–416.
+
+clusterfck cluster analysis library: https://github.com/harthur/clusterfck
+
+Arthur, D., Vassilvitskii, S., k-means++: The Advantages of Careful Seeding: http://ilpubs.stanford.edu:8090/778/1/2006-13.pdf
+presentation on above: http://theory.stanford.edu/~sergei/slides/BATS-Means.pdf

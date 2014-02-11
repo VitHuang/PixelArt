@@ -17,8 +17,8 @@ void main(void) {
 	vec3 normal = normalize(varNormal);
 	vec4 fragColour;
 	float diffuseFactor = diffuseLighting(normal, vec3(0.57735)); // vec3(0.57735, 0.57735, 0.57735) is the normalised vector with equal positive x,y,z components
-	float specularFactor = specularReflection(normal, vec3(0.57735), 5.0);
+	float specularFactor = specularReflection(normal, vec3(0.57735), 5.0) * 0.0;
 	vec3 diffuseLighting = vec3(1.0, 1.0, 1.0) * diffuseFactor;
-	vec3 ambientLighting = vec3(0.5, 0.5, 0.5);
-	gl_FragColor = vec4((texture2D(texture, varTexCoord) * vec4(ambientLighting + diffuseLighting, 1.0)).xyz, specularFactor);
+	vec3 ambientLighting = vec3(0.6, 0.6, 0.6);
+	gl_FragColor = vec4((texture2D(texture, varTexCoord) * vec4(max(ambientLighting, diffuseLighting), 1.0)).xyz, specularFactor);
 }

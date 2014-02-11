@@ -8,6 +8,7 @@ var normalShader;
 var depthShader;
 var outlineShader;
 var ciede2000Shader;
+var rgbToLabShader;
 var conversionFramebuffer;
 var phongTexture;
 var mvMatrix = mat4.create();
@@ -26,6 +27,10 @@ var loadedPalette = false;
 var stereoscopic = false;
 var drawOutlines = true;
 var transVal = 12.0;
+var paletteSize = 16;
+var shadingLevels = 1;
+var paletteBufferSize = 64;
+var shades = [0.2, 0.5, 0.8, 1.0];
 
 function screenBufferWidth() {
 	return 128;
@@ -41,7 +46,7 @@ function areShadersLoaded() {
 
 function initGL(canvas) {
 	try {
-		gl = canvas.getContext("webgl"/*, {antialias:false}*/);
+		gl = canvas.getContext("webgl", {preserveDrawingBuffer: true} );
 		if (stereoscopic) {
 			gl.viewportWidth = canvas.width / 2;
 		} else {
@@ -268,6 +273,22 @@ function initCiede2000Shader() {
 	}
 }
 
+function initRgbToLabShader() {
+	rgbToLabShader = createShaderFromFiles("rgbtolab.vs", "rgbtolab.fs");
+	rgbToLabShader.onLink = function() {
+		gl.useProgram(rgbToLabShader);
+		rgbToLabShader.vertexPosition = gl.getAttribLocation(rgbToLabShader, "vertexPosition");
+		rgbToLabShader.texCoord = gl.getAttribLocation(rgbToLabShader, "texCoord");
+		rgbToLabShader.pMatrix = gl.getUniformLocation(rgbToLabShader, "pMatrix");
+		rgbToLabShader.mvMatrix = gl.getUniformLocation(rgbToLabShader, "mvMatrix");
+		rgbToLabShader.texture = gl.getUniformLocation(rgbToLabShader, "texture");
+		rgbToLabShader.rgbConversion = gl.getUniformLocation(rgbToLabShader, "rgbConversion");
+		rgbToLabShader.rgbConversionMatrix = mat3.create([0.4124, 0.3576, 0.1805, 0.2126, 0.7152, 0.0722, 0.0193, 0.1192, 0.9505]);
+		gl.uniformMatrix3fv(rgbToLabShader.rgbConversion, false, rgbToLabShader.rgbConversionMatrix);
+		rgbToLabShader.loaded = true;
+	}
+}
+
 function initScreenFramebuffer() {
 	screenFramebuffer = gl.createFramebuffer();
 	gl.bindFramebuffer(gl.FRAMEBUFFER, screenFramebuffer);
@@ -294,6 +315,130 @@ function setupScreenTexture(scale) {
 	return texture;
 }
 
+function findCorners(block) {
+	block.minCorner = [255, 255, 255];
+	block.maxCorner = [0, 0, 0];
+	for (var i = 0; i < block.length; i++) {
+		var colour = block[i];
+		block.minCorner[0] = Math.min(block.minCorner[0], colour[0]);
+		block.minCorner[1] = Math.min(block.minCorner[1], colour[1]);
+		block.minCorner[2] = Math.min(block.minCorner[2], colour[2]);
+		block.maxCorner[0] = Math.max(block.maxCorner[0], colour[0]);
+		block.maxCorner[1] = Math.max(block.maxCorner[1], colour[1]);
+		block.maxCorner[2] = Math.max(block.maxCorner[2], colour[2]);
+	}
+	block.longestSide = 0;
+	block.longestSideLength = block.maxCorner[0] - block.minCorner[0];
+	if (block.maxCorner[1] - block.minCorner[1] > block.longestSideLength) {
+		block.longestSide = 1;
+		block.longestSideLength = block.maxCorner[1] - block.minCorner[1];
+	}
+	if (block.maxCorner[2] - block.minCorner[2] > block.longestSideLength) {
+		block.longestSide = 2;
+		block.longestSideLength = block.maxCorner[2] - block.minCorner[2];
+	}
+}
+
+function blockAverages(blocks) {
+	var palette = [];
+	for (var i = 0; i < blocks.length; i++) {
+		var bl = blocks[i];
+		console.log(bl);
+		if (bl) {
+			var mean = [0, 0, 0, 255];
+			for (var j = 0; j < bl.length; j++) {
+				var colour = bl[j];
+				mean[0] += colour[0];
+				mean[1] += colour[1];
+				mean[2] += colour[2];
+			}
+			mean[0] /= bl.length;
+			mean[1] /= bl.length;
+			mean[2] /= bl.length;
+			palette = palette.concat(mean);
+		} else {
+			palette = palette.concat([0, 0, 0, 255]);
+		}
+	}
+	return palette;
+}
+
+function medianCut(data) {
+	var block = [];
+	for (var i = 0; i < data.length / 4; i++) {
+		var colour = data.subarray(i * 4, i * 4 + 4);
+		block.push([colour[0], colour[1], colour[2]]);
+	}
+	findCorners(block);
+	var blocks = [block];
+	while (blocks.length < paletteSize) {
+		blocks.sort(function(a, b) { return a.longestSideLength - b.longestSideLength; });
+		var bl = blocks.pop();
+		bl.sort(function(a, b) { return a[bl.longestSide] - b[bl.longestSide]; });
+		var index = bl.length / 2;
+		var front = bl.slice(0, index);
+		findCorners(front);
+		blocks.push(front);
+		var back = bl.slice(index, bl.length);
+		findCorners(back);
+		blocks.push(back);
+	}
+	return blockAverages(blocks);
+}
+
+function kMeansPalette(data) {
+	array = [];
+	for (var i = 0; i < data.length / 4; i++) {
+		for (var j = 0; j < shades.length; j++) {
+			array.push([data[i * 4] * shades[j], data[i * 4 + 1] * shades[j], data[i * 4 + 2] * shades[j]]);
+		}
+	}
+	var blocks = clusterfck.kmeans(array, paletteSize);
+	return blockAverages(blocks);
+}
+
+function kMedoidsPalette(data) {
+	array = [];
+	for (var i = 0; i < data.length / 4; i++) {
+		for (var j = 0; j < shades.length; j++) {
+			array.push([data[i * 4] * shades[j], data[i * 4 + 1] * shades[j], data[i * 4 + 2] * shades[j]]);
+		}
+	}
+	var blocks = kMedoids(array, paletteSize);
+	return blockAverages(blocks);
+}
+
+function createPalette(texture) {
+
+	
+	
+	var paletteTexture = gl.createTexture();
+	var paletteFramebuffer = gl.createFramebuffer();
+	gl.bindFramebuffer(gl.FRAMEBUFFER, conversionFramebuffer);
+	gl.bindTexture(gl.TEXTURE_2D, paletteTexture);
+	gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+	gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+	gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+	gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+	gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, paletteBufferSize, paletteBufferSize, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+	gl.bindFramebuffer(gl.FRAMEBUFFER, paletteFramebuffer);
+	gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, paletteTexture, 0);
+	gl.viewport(0, 0, paletteBufferSize, paletteBufferSize);
+	
+	gl.bindTexture(gl.TEXTURE_2D, texture);
+	drawRectangle(textureShader);
+	
+	
+	var data = new Uint8Array(paletteBufferSize * paletteBufferSize * 4);
+	gl.readPixels(0, 0, paletteBufferSize, paletteBufferSize, gl.RGBA, gl.UNSIGNED_BYTE, data);
+	
+	gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+	gl.bindTexture(gl.TEXTURE_2D, null);
+	gl.deleteFramebuffer(paletteFramebuffer);
+	gl.deleteTexture(paletteTexture);
+	return kMeansPalette(data);
+}
+
 function createConversionTextures(palette) {
 	ciede2000Texture = gl.createTexture();
 	conversionFramebuffer = gl.createFramebuffer();
@@ -301,6 +446,8 @@ function createConversionTextures(palette) {
 	gl.bindTexture(gl.TEXTURE_2D, ciede2000Texture);
 	gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
 	gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+	gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+	gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
 	gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 4096, 4096, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
 	conversionFramebuffer = gl.createFramebuffer();
 	gl.bindFramebuffer(gl.FRAMEBUFFER, conversionFramebuffer);
@@ -310,12 +457,14 @@ function createConversionTextures(palette) {
 	gl.viewport(0, 0, 4096, 4096);
 	gl.bindTexture(gl.TEXTURE_2D, palette);
 	gl.activeTexture(gl.TEXTURE0);
+	gl.useProgram(ciede2000Shader);
 	gl.uniform1i(ciede2000Shader.palette, 0);
 	drawRectangle(ciede2000Shader);
 	//gl.depthMask(gl.TRUE);
 	//gl.enable(gl.DEPTH_TEST);
 	gl.bindFramebuffer(gl.FRAMEBUFFER, null);
 	gl.bindTexture(gl.TEXTURE_2D, null);
+	gl.deleteFramebuffer(conversionFramebuffer);
 }
 
 
@@ -331,6 +480,7 @@ function handleLoadModel(data, model) {
 	var faces = [];
 	var inHeader = true;
 	var match;
+	var largestIndex = 0;
 	for (var i in lines) {
 		if (lines[i].match(/end_header/)) {
 			inHeader = false;
@@ -349,27 +499,31 @@ function handleLoadModel(data, model) {
 			var split = lines[i].replace(/^\s+/, "").split(/\s+/);
 			if (split.length >= 8 && currentVertex < vertexCount) {
 				vertices.push(parseFloat(split[0]));
-				vertices.push(parseFloat(split[1]));
 				vertices.push(parseFloat(split[2]));
+				vertices.push(parseFloat(split[1]));
 				normals.push(parseFloat(split[3]));
-				normals.push(parseFloat(split[4]));
 				normals.push(parseFloat(split[5]));
+				normals.push(parseFloat(split[4]));
 				texCoords.push(parseFloat(split[6]));
 				texCoords.push(parseFloat(split[7]));
 				currentVertex += 1;
-			}
-			if (split.length >= 4 && currentVertex >= vertexCount && currentFace < faceCount) {
-				// assume split[0] = 3, i.e. triangles
-				faces.push(parseInt(split[1]));
-				faces.push(parseInt(split[2]));
-				faces.push(parseInt(split[3]));
-				currentFace += 1
+			} else {
+				if (split.length >= 4 && currentVertex >= vertexCount && currentFace < faceCount) {
+					// assume split[0] = 3, i.e. triangles
+					faces.push(parseInt(split[1]));
+					faces.push(parseInt(split[2]));
+					faces.push(parseInt(split[3]));
+					currentFace += 1
+				}
 			}
 		}
 	}
+	console.log(faces[0]);
 	model.vertexBuffer = gl.createBuffer();
 	gl.bindBuffer(gl.ARRAY_BUFFER, model.vertexBuffer);
-	gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.STATIC_DRAW);
+	var vertexArray = new Float32Array(vertices);
+	console.log(vertexArray.length);
+	gl.bufferData(gl.ARRAY_BUFFER, vertexArray, gl.STATIC_DRAW);
 	model.vertexBuffer.itemSize = 3;
 	model.vertexBuffer.numItems = vertexCount;
 	model.normalBuffer = gl.createBuffer();
@@ -393,9 +547,19 @@ function handleLoadedTexture(model) {
 	gl.bindTexture(gl.TEXTURE_2D, model.texture);
 	gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
 	gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, model.texture.image);
+	gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+	gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+	gl.generateMipmap(gl.TEXTURE_2D);
+	var palette = createPalette(model.texture);
+	model.palette = gl.createTexture();
+	gl.bindTexture(gl.TEXTURE_2D, model.palette);
+	gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, palette.length / 4, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array(palette));
 	gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
 	gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+	gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+	gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
 	gl.bindTexture(gl.TEXTURE_2D, null);
+	loadedPalette = true;
 }
 
 function loadModel(filename, model) {
@@ -418,17 +582,19 @@ function loadTexture(filename, model, palette) {
 	}
 	model.texture.image.src = filename;
 	// TODO: auto-generate palette using median cut or octree quantisation; for now, load from file
-	model.palette = gl.createTexture();
+	/*model.palette = gl.createTexture();
 	model.palette.image = new Image();
 	model.palette.image.onload = function() {
 		gl.bindTexture(gl.TEXTURE_2D, model.palette);
 		gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, model.palette.image);
 		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
 		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
 		gl.bindTexture(gl.TEXTURE_2D, null);
 		loadedPalette = true;
-	}
-	model.palette.image.src = "palette3.png";
+	}*/
+	//model.palette.image.src = "scolipedepalette.png";
 }
 
 function renderOutline(model) {
@@ -471,7 +637,7 @@ function drawRectangle(shader) {
 	gl.bindBuffer(gl.ARRAY_BUFFER, rectBuffer);
 	gl.enableVertexAttribArray(shader.vertexPosition);
 	gl.vertexAttribPointer(shader.vertexPosition, 2, gl.FLOAT, false, 0, 0);
-	if (typeof shader.texCoord != "undefined") {
+	if (typeof shader.texCoord != "undefined" && shader.texCoord >= 0) {
 		gl.enableVertexAttribArray(shader.texCoord);
 		gl.vertexAttribPointer(shader.texCoord, 2, gl.FLOAT, false, 0, 0);
 	}
@@ -479,14 +645,14 @@ function drawRectangle(shader) {
 }
 
 function drawModel(shader, model) {
-	mat4.perspective(45, screenBufferWidth() / screenBufferHeight(), 150.0, 400.0, pMatrix);
+	mat4.perspective(30, screenBufferWidth() / screenBufferHeight(), 25.0, 50.0, pMatrix);
 	mat4.identity(mvMatrix);
 
-	mat4.translate(mvMatrix, [0.0, -20.0, -300.0]);
+	mat4.translate(mvMatrix, [0.0, -5.0, -39.0]);
 	if (stereoscopic) {
 		mat4.translate(mvMatrix, [transVal, 0.0, 0.0]);
 	}
-	mat4.rotate(mvMatrix, 0.5, [1.0, 0.0, 0.0]);
+	mat4.rotate(mvMatrix, 0.0, [1.0, 0.0, 0.0]);
 	mat4.rotate(mvMatrix, time, [0.0, 1.0, 0.0]);
 
 	mat4.toInverseMat3(mvMatrix, normalMatrix);
@@ -570,6 +736,9 @@ function draw() {
 	gl.viewport((stereoscopic && transVal < 0) ? gl.viewportWidth : 0, 0, gl.viewportWidth, gl.viewportHeight);
 	gl.bindTexture(gl.TEXTURE_2D, screenTexture);
 	drawRectangle(textureShader);
+	gl.viewport(0, 0, gl.viewportWidth / 8, gl.viewportHeight / 8);
+	gl.bindTexture(gl.TEXTURE_2D, teapotModel.palette);
+	drawRectangle(textureShader);
 }
 
 function testOutline() {
@@ -621,8 +790,8 @@ function start() {
 	depthTexture = setupScreenTexture();
 	phongTexture = setupScreenTexture();
 	initScreenFramebuffer();
-	loadModel("teapot2.ply", teapotModel);
-	loadTexture("texture3.png", teapotModel);
+	loadModel("scolipede2.ply", teapotModel);
+	loadTexture("scolipede2.png", teapotModel);
 	gl.clearColor(0.0, 0.0, 0.0, 1.0);
 	gl.enable(gl.DEPTH_TEST);
 	gl.depthFunc(gl.LEQUAL);
