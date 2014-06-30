@@ -1,11 +1,33 @@
-\documentclass[12pt]{article}
+\documentclass[12pt,twoside,notitlepage]{report}
 \usepackage{a4wide}
 \usepackage{graphicx}
+
+
+\raggedbottom                           % try to avoid widows and orphans
+\sloppy
+\clubpenalty1000%
+\widowpenalty1000%
+
+\addtolength{\oddsidemargin}{6mm}       % adjust margins
+\addtolength{\evensidemargin}{-8mm}
+
+\renewcommand{\baselinestretch}{1.1}    % adjust line spacing to make
+                                        % more readable
 
 \parindent 0pt
 \parskip 6pt
 
 \begin{document}
+
+\pagestyle{empty}
+
+\vspace*{60mm}
+\begin{center}
+\Huge
+{\bf Project Proposal}
+\end{center}
+
+\cleardoublepage
 
 \section*{Introduction and Description of the Work}
 

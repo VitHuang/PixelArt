@@ -1,0 +1,11 @@
+importance factor for parts of model: size, colour
+
+sources for artistic background.
+- what I'm not trying to recreate (e.g. animations - Sonic's legs etc)
+bibliography detail - 'someone should just be able to sit down and do it from scratch'
+
+few words about performance, coding style etc for JS - compare a component of it with the same in C++?
+
+find 3D model of game characters rather than teapot (try on modern character models)
+
+talk about colour selection (e.g. across animation frames)

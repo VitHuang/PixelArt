@@ -19,3 +19,19 @@ clusterfck cluster analysis library: https://github.com/harthur/clusterfck
 
 Arthur, D., Vassilvitskii, S., k-means++: The Advantages of Careful Seeding: http://ilpubs.stanford.edu:8090/778/1/2006-13.pdf
 presentation on above: http://theory.stanford.edu/~sergei/slides/BATS-Means.pdf
+
+todo: find 'Pixel World' by Francis Lam in UL
+
+Inglis, T., Pixelating Vector Line Art: http://src.acm.org/2013/TiffanyInglis.pdf
+
+Gerstner, T., Pixelated Image Abstraction: http://gfx.cs.princeton.edu/gfx/pubs/Gerstner_2012_PIA/index.php
+
+possibly: Character Design for Mobile Devices by Lawrence Wright (not in UL and £130 expensive...)
+
+radius of projected sphere: http://stackoverflow.com/questions/3717226/radius-of-projected-sphere
+
+guess I need to reference games that my examples of pixel art / 3D models I'm using are from:
+- proposal has Space Invaders and Zelda 1/LttP/Minish Cap
+- standard test models are Stanford dragon/Utah teapot
+- current Pokémon model used in shader is from PokéPark 2, and the corresponding pixel art is from Pokémon Black/White
+- add more to this list as I use them

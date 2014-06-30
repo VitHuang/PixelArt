@@ -1,9 +1,11 @@
 precision highp float;
 uniform sampler2D palette;
 uniform mat3 rgbConversion;
+uniform int paletteSize;
 
 #define PI 3.141592653589793238462643383279
 
+// the precision of the cache
 const int bits = 8;
 
 float linearise(float c) {
@@ -83,7 +85,6 @@ float ciede2000(vec3 lab1, vec3 lab2) {
 		}
 	}
 	float t = 1.0 - 0.17 * dcos(havg - 30.0) + 0.24 * dcos(2.0 * havg) + 0.32 * dcos(3.0 * havg + 6.0) - 0.2 * dcos(4.0 * havg - 63.0);
-	//float sqterm = ((havg - 55.0 * PI / 36.0) / 25.0);
 	float sqterm = ((havg - 275.0) / 25.0);
 	float dtheta = 30.0 * exp(-(sqterm * sqterm));
 	float cpavg7 = cpavg * cpavg * cpavg * cpavg * cpavg * cpavg * cpavg;
@@ -104,6 +105,7 @@ vec3 srgbToCiexyz(vec3 srgb) {
 
 vec3 srgbToCielab(vec3 srgb) {
 	vec3 ciexyz = srgbToCiexyz(srgb);
+	// adjust for sRGB white point before calling labf
 	float fX = labf(ciexyz.x / 0.95047);
 	float fY = labf(ciexyz.y);
 	float fZ = labf(ciexyz.z / 1.08883);
@@ -115,13 +117,16 @@ vec4 getClosestColour(vec4 colour) {
 	float bestDist = -1.0;
 	vec4 bestColour;
 	vec4 paletteColour;
-	// TODO: pass this value in from main program since WebGL apparently doesn't support GLSL textureSize
-	for (int i = 0; i < 16; i++) {
-		paletteColour = texture2D(palette, vec2(float(i) / 16.0, 0));
+	// GLSL does not support comparing loop count to a variable, so just loop to a safe number and break when necessary
+	for (int i = 0; i < 64; i++) {
+		paletteColour = texture2D(palette, vec2(float(i) / float(paletteSize), 0));
 		float dist = ciede2000(srgbToCielab(colour.rgb), srgbToCielab(paletteColour.rgb));
 		if (dist < bestDist || bestDist < 0.0) {
 			bestColour = paletteColour;
 			bestDist = dist;
+		}
+		if (i >= paletteSize) {
+			break;
 		}
 	}
 	return bestColour;
@@ -130,9 +135,9 @@ vec4 getClosestColour(vec4 colour) {
 void main(void) {
 	float size = pow(2.0, float(bits));
 	float sqrtSize = sqrt(size);
+	// since we're building a cache texture, the colour to quantise is a function of the fragment coordinates
 	float r = mod(gl_FragCoord.x, size) / (size - 1.0);
 	float g = mod(gl_FragCoord.y, size) / (size - 1.0);
 	float b = (floor(gl_FragCoord.x / size) / (sqrtSize - 1.0) + floor(gl_FragCoord.y / size)) / (sqrtSize - 1.0);
 	gl_FragColor = getClosestColour(vec4(r, g, b, 1.0));
-	//gl_FragColor = vec4(r, g, b, 1.0);
 }

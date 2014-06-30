@@ -1,0 +1,49 @@
+Table of Contents:
+C1: Introduction
+C2: Preparation
+C3: Implementation
+C3.1: Overview
+C3.2: Colour difference
+C3.3: Palette selection
+C3.4: Lighting
+C3.5: Outlines
+C3.6: Detail preservation
+C4: Evaluation
+C5: Conclusion
+Bibliography
+Appendices
+- pictures: examples of output compared to hand-drawn art
+- examples of results of different parameters
+Index
+
+Implementation chapter:
+3.1: Overview
+3.2: Colour difference (this is used in all other parts of implementation, so I think this should go first)
+- Explanation of perceptual uniformity, examples of why it's needed
+- Explanation of CIEDE2000
+- Comparison of different algorithms (possibly too similar to part of evaluation? I want to compare rendering times using different algorithms)
+- Explanation and reasoning for caching CIEDE2000 in a texture; alternative approaches (mention Voronoi diagram approach for CIE94)
+3.3: Palette selection
+- Reasoning behind including palette selection
+- Explanation of algorithm used (currently k-means, but might change in the next week or two)
+- Explanation of how data points are generated (at the moment texture data + lightness/hue tweaks)
+- Comparison with other algorithms
+3.4: Lighting
+- Explanation of how the lighting works (Phong shading, then closest colour)
+- Brief mention of alternative approach used in cel shading, reasoning as to why I chose different method
+- Explain how I implemented dithering, possible extensions to improve dithering (e.g. error diffused dithering)
+- Possible extensions to lighting (e.g. self shadowing, materials)
+3.5: Outlines
+- Explanation of how pixels on outline are calculated
+- Explanation as to why I'm not using Gooch outlining (GLES limitations)
+- Comparison with original implementation using Canny edge detector
+- Explanation of outline antialiasing in art style
+- Explanation of my implementation based on FXAA
+- Other potential methods of antialiasing?
+3.6: Detail preservation
+- Explain need for detail preservation
+- Palette preservation across animation frames (current k-means implementation doesn't really do this since it's based solely on the model's texture and ignores animation, but as I said earlier it's possible this might change)
+- Explanation of why we need to enlarge small areas of model
+- Explanation of my (not yet done) implementation of above, talk about how we need to preprocess model
+- How could this be done using vertex/tesselation shaders in desktop OpenGL
+- Extensions – other types of detail that might be preserved

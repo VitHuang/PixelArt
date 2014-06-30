@@ -10,11 +10,11 @@ uniform mat3 rgbConversion;
 uniform ivec2 textureSize;
 
 const int conversionBits = 8;
-const float ditherFactor = 0.00;
 const float edgeThreshold = 0.3;
 const int antialiasDistance = 16;
-const vec4 outlineColour = vec4(0.5, 0.5, 0.5, 1.0);
-const vec4 edgeColour = vec4(0.2, 0.2, 0.2, 1.0);
+const vec4 outlineColour = vec4(0.8, 0.8, 0.8, 1.0);
+const vec4 midColour = vec4(0.2, 0.2, 0.2, 1.0);
+const vec4 edgeColour = vec4(0.8, 0.8, 0.8, 1.0);
 const float minEdgeLDifference = 10.0;
 
 float unpack(vec4 pack) {
@@ -51,6 +51,10 @@ vec3 srgbToCielab(vec3 srgb) {
 	float fZ = labf(ciexyz.z / 1.08883);
 	vec3 cielab = vec3(max(116.0 * fY - 16.0, 0.0), 500.0 * (fX - fY), 200.0 * (fY - fZ));
 	return cielab;
+}
+
+float weightFun(float pos) {
+	return sin(pos * 1.57079633);
 }
 
 vec4 antialiasHorizontal() {
@@ -90,7 +94,12 @@ vec4 antialiasHorizontal() {
 		rcolour = outlineColour;
 	}
 	vec4 colour = texture2D(phongTexture, coord);
-	return (lcolour * (1.0 - weighting) + rcolour * weighting) * clamp((colour + colour.a), 0.0, 1.0);
+	float w = sin(weighting * 3.14159265359);
+	if (weighting < 0.5) {
+		return (lcolour * (1.0 - w) + midColour * w) * clamp((colour + colour.a), 0.0, 1.0);
+	} else {
+		return (rcolour * (1.0 - w) + midColour * w) * clamp((colour + colour.a), 0.0, 1.0);
+	}
 }
 
 vec4 antialiasVertical() {
@@ -130,7 +139,11 @@ vec4 antialiasVertical() {
 		ucolour = outlineColour;
 	}
 	vec4 colour = texture2D(phongTexture, coord);
-	return (dcolour * (1.0 - weighting) + ucolour * weighting) * clamp((colour + colour.a), 0.0, 1.0);
+	if (weighting < 0.5) {
+		return (dcolour * (0.5 - weighting) * 2.0 + midColour * weighting * 2.0) * clamp((colour + colour.a), 0.0, 1.0);
+	} else {
+		return (ucolour * (weighting - 0.5) * 2.0 + midColour * (1.0 - weighting) * 2.0) * clamp((colour + colour.a), 0.0, 1.0);
+	}
 }
 
 vec4 antialias() {
@@ -195,7 +208,7 @@ vec4 getEdgeColour(vec4 colour) {
 			colour = colour * vec4(0.9, 0.9, 0.9, 1.0);
 			paletteColour = getMatchingColour(colour);
 			l = srgbToCielab(paletteColour.rgb).x + minEdgeLDifference;
-			if ((l < ll && l < rl && l < dl && l < ul) || length(colour.rgb) <= 0.1) {
+			if (l < ll && l < rl && l < dl && l < ul) {
 				break;
 			}
 		}
@@ -208,21 +221,10 @@ void main(void) {
 	float specularFactor = fragColour.a;
 	float edgeIntensity = texture2D(edgeTexture, gl_FragCoord.xy / vec2(textureSize)).r;
 	if (edgeIntensity > edgeThreshold) {
-		if (specularFactor > 1.0) {
-			fragColour = fragColour * (1.0 - edgeIntensity) + edgeColour * edgeIntensity;
-		} else {
-			fragColour = fragColour * (1.0 - edgeIntensity) + antialias() * edgeIntensity;
-		}
+		fragColour = antialias();
 		gl_FragColor = getEdgeColour(fragColour);
 	} else {
 		fragColour = fragColour + vec4(vec3(specularFactor), 1.0);
-		// LET'S DITHER SOME THINGS
-		fragColour += (mod(gl_FragCoord[0] + gl_FragCoord[1], 2.0)) * ditherFactor * 2.0 - ditherFactor;
-		//fragColour += floor((mod(gl_FragCoord[0], 2.0) + mod(gl_FragCoord[1], 2.0)) / 2.0) * ditherFactor / 2.0;
-		//fragColour += floor((mod(gl_FragCoord[0] + 1.0, 2.0) + mod(gl_FragCoord[1], 2.0)) / 2.0) * -ditherFactor / 2.0;
-		//fragColour -= floor((2.0 - (mod(gl_FragCoord[0], 2.0) + mod(gl_FragCoord[1], 2.0))) / 2.0) * ditherFactor;
 		gl_FragColor = getMatchingColour(fragColour);
 	}
-	//vec2 paletteMapIndex = vec2(floor(fragColour.r * 255.0) * 16.0 + floor(fragColour.g * 16.0), floor(fragColour.b * 255.0) * 16.0 + floor(mod(fragColour.g * 255.0, 16.0)));
-	//gl_FragColor = fragColour;
 }

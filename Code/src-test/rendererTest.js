@@ -101,7 +101,7 @@ fragmentTestSuite('pixel shader', loadScriptFile('pixel.fs'), function() {
 	  .equal(2.0425)
 	  .withEpsilonOf(0.0003); // quite a lot of floating point error
   });
-  // TODO: figure out how as2DTexture works, because it doesn't seem to.
+  // as2DTexture doesn't work, so commenting this out in case it's ever fixed
   /*testMain('Test closest colour', function() {
     set('rgbConversion').asArray([0.4124, 0.3576, 0.1805, 0.2126, 0.7152, 0.0722, 0.0193, 0.1192, 0.9502]);
 	var palette = new Array();

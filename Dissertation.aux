@@ -1,0 +1,156 @@
+\relax 
+\citation{Engelbart:1968:RCA:1476589.1476645}
+\@writefile{toc}{\contentsline {chapter}{\numberline {1}Introduction}{5}}
+\@writefile{lof}{\addvspace {10\p@ }}
+\@writefile{lot}{\addvspace {10\p@ }}
+\@writefile{toc}{\contentsline {section}{\numberline {1.1}Pixel Art}{5}}
+\@writefile{lof}{\contentsline {figure}{\numberline {1.1}{\ignorespaces An example of early pixel art, from \textit  {Space Invaders} (1978) by Tomohiro Nishikado}}{6}}
+\newlabel{fig:spaceinvader}{{1.1}{6}}
+\@writefile{lof}{\contentsline {figure}{\numberline {1.2}{\ignorespaces The evolution of pixel art: several sprites depicting the character `Link' from \textit  {The Legend of Zelda} series (Nintendo, 1986-2005)}}{7}}
+\newlabel{fig:link}{{1.2}{7}}
+\@writefile{lof}{\contentsline {figure}{\numberline {1.3}{\ignorespaces Examples of types of dithering (from Wikimedia Commons)}}{7}}
+\@writefile{lof}{\contentsline {figure}{\numberline {1.4}{\ignorespaces An advertisement using pixel art, by Pedro Cyrne (2012)}}{8}}
+\newlabel{fig:advert}{{1.4}{8}}
+\citation{Decaudin:1996:CLR}
+\citation{Gerstner:2012:PIA}
+\@writefile{toc}{\contentsline {section}{\numberline {1.2}2D versus 3D}{9}}
+\@writefile{toc}{\contentsline {section}{\numberline {1.3}Related Work}{9}}
+\citation{Inglis:2012:PVL:2330147.2330153}
+\@writefile{toc}{\contentsline {chapter}{\numberline {2}Preparation}{11}}
+\@writefile{lof}{\addvspace {10\p@ }}
+\@writefile{lot}{\addvspace {10\p@ }}
+\@writefile{toc}{\contentsline {section}{\numberline {2.1}Art Style}{11}}
+\@writefile{lof}{\contentsline {figure}{\numberline {2.1}{\ignorespaces Examples of different styles of pixel art in video games. Clockwise from top left: a character animation frame (\textit  {BlazBlue: Calamity Trigger}, Arc System Works, 2008), background scenery (\textit  {Chrono Trigger}, Square, 1995), a scene illustration (\textit  {Cave Story}, Studio Pixel, 2004), and pixel art mixed with newer technology such as alpha blending (\textit  {Hyper Light Drifter}, Heart Machine, 2014)}}{12}}
+\newlabel{fig:pixelexamples}{{2.1}{12}}
+\@writefile{lof}{\contentsline {figure}{\numberline {2.2}{\ignorespaces Pixel art from \textit  {Pok\'{e}mon Black/White Version 2} (2012) by Game Freak; pixel art team led by Hironobu Yoshida}}{13}}
+\@writefile{toc}{\contentsline {section}{\numberline {2.2}Implementation Choices}{13}}
+\citation{W3Schools:BrowserShare}
+\@writefile{toc}{\contentsline {section}{\numberline {2.3}Unit Testing}{14}}
+\@writefile{toc}{\contentsline {section}{\numberline {2.4}Changes to the Proposal}{14}}
+\@writefile{toc}{\contentsline {chapter}{\numberline {3}Implementation}{16}}
+\@writefile{lof}{\addvspace {10\p@ }}
+\@writefile{lot}{\addvspace {10\p@ }}
+\@writefile{toc}{\contentsline {section}{\numberline {3.1}Overview}{16}}
+\@writefile{toc}{\contentsline {subsubsection}{GLSL Shaders}{16}}
+\@writefile{lof}{\contentsline {figure}{\numberline {3.1}{\ignorespaces The OpenGL ES pipeline; image by Khronos Group (2007).}}{17}}
+\newlabel{fig:pipeline}{{3.1}{17}}
+\@writefile{toc}{\contentsline {subsubsection}{JavaScript code}{17}}
+\@writefile{lof}{\contentsline {figure}{\numberline {3.2}{\ignorespaces An aliased edge is shown on the left, with the same edge but anti-aliased on the right. The anti-aliased image introduces colours that were not directly produced by the shader, which was an issue when attempting to emulate the strict palettes used in pixel art.}}{19}}
+\newlabel{fig:aliasing}{{3.2}{19}}
+\@writefile{toc}{\contentsline {section}{\numberline {3.2}Colour Quantisation}{19}}
+\@writefile{lol}{\contentsline {lstlisting}{\numberline {3.1}Texture loaded callback}{20}}
+\newlabel{eq:rgbdifference}{{3.1}{20}}
+\citation{COTE:COTE376}
+\citation{CIE:2001:142-2001}
+\newlabel{eq:labdifference}{{3.7}{21}}
+\@writefile{lof}{\contentsline {figure}{\numberline {3.3}{\ignorespaces A textured `Utah teapot' model, lit using the Phong algorithm. The texture used is shown to the right.}}{22}}
+\@writefile{lof}{\contentsline {figure}{\numberline {3.4}{\ignorespaces From left to right: no quantisation, sRGB distance, CIELAB distance, CIEDE2000. Note the circled artefact on the red stripe on the CIELAB-quantised teapot caused by the CIELAB difference between shades of red not corresponding to perceived difference, and the shading edges not lining up on the CIELAB and CIEDE2000 (circled) teapots due to the palette being designed for sRGB.}}{22}}
+\newlabel{fig:teapots}{{3.4}{22}}
+\@writefile{lof}{\contentsline {figure}{\numberline {3.5}{\ignorespaces A 2D texture representing the 3D RGB colour space. Each of the 256 square tiles is a different slice of the full RGB cube; each 24-bit RGB value appears exactly once.}}{23}}
+\citation{Heckbert:1982:CIQ:965145.801294}
+\@writefile{toc}{\contentsline {section}{\numberline {3.3}Palette Selection}{24}}
+\newlabel{subsec:paletteselection}{{3.3}{24}}
+\citation{macqueen1967}
+\citation{Arthur:clusterfck}
+\@writefile{loa}{\contentsline {algorithm}{\numberline {1}{\ignorespaces Median Cut}}{25}}
+\newlabel{alg:mediancut}{{1}{25}}
+\citation{Phong:1975:ICG:360825.360839}
+\@writefile{lof}{\contentsline {figure}{\numberline {3.6}{\ignorespaces A model of `Scolipede'; the two images on the left show two palettes selected using median cut. The leftmost image uses unmodified median cut, while the central image had duplicate colours removed beforehand. Model and texture from \textit  {Pok\'{e}Park 2} (2011; Creatures Inc.); graphic director Hiroaki Ito; the rightmost image shows how the model appears in the original game.}}{26}}
+\newlabel{fig:mediancutexample}{{3.6}{26}}
+\@writefile{loa}{\contentsline {algorithm}{\numberline {2}{\ignorespaces $k$-means}}{27}}
+\newlabel{alg:kmeans}{{2}{27}}
+\@writefile{lof}{\contentsline {figure}{\numberline {3.7}{\ignorespaces `Scolipede' with three different palettes selected using $k$-means. The left image has a total squared difference of 1781.51, while the central image has a total squared difference of 3259.26. The right image uses the palette with the smallest total squared difference from 20 runs of the algorithm.}}{27}}
+\newlabel{fig:kmeansexample}{{3.7}{27}}
+\citation{Decaudin:1996:CLR}
+\@writefile{toc}{\contentsline {section}{\numberline {3.4}Lighting}{28}}
+\@writefile{toc}{\contentsline {subsubsection}{Intensity stepping}{28}}
+\newlabel{eq:phong}{{3.8}{28}}
+\@writefile{toc}{\contentsline {subsubsection}{Dithering}{29}}
+\@writefile{lol}{\contentsline {lstlisting}{\numberline {3.2}Simple dithering in GLSL}{29}}
+\@writefile{lof}{\contentsline {figure}{\numberline {3.8}{\ignorespaces Pixel art of `Charizard' from \textit  {Pok\'{e}mon Black 2/White 2}. Note the use of dithering on the wing and tail.}}{30}}
+\newlabel{fig:charizard}{{3.8}{30}}
+\@writefile{lof}{\contentsline {figure}{\numberline {3.9}{\ignorespaces `Scolipede' rendered with three different levels of dithering. From left to right, $ditherFactor = 0.01$, $0.02$, and $0.05$.}}{30}}
+\newlabel{fig:scolipededither}{{3.9}{30}}
+\citation{Floyd:1976:AAS}
+\@writefile{loa}{\contentsline {algorithm}{\numberline {3}{\ignorespaces Error-corrected checkerboard dithering}}{31}}
+\@writefile{toc}{\contentsline {section}{\numberline {3.5}Outlines}{31}}
+\newlabel{subsec:outlines}{{3.5}{31}}
+\@writefile{toc}{\contentsline {subsubsection}{Detecting Outlines}{31}}
+\citation{Sobel1968}
+\@writefile{lof}{\contentsline {figure}{\numberline {3.10}{\ignorespaces The pyramid on the left is only outlined where front faces meet back faces. The pyramid on the right also has an outline along the edge where the front faces meet.}}{32}}
+\newlabel{fig:interiouroutline}{{3.10}{32}}
+\citation{Canny:1986:CAE:11274.11275}
+\@writefile{lol}{\contentsline {lstlisting}{\numberline {3.3}Packing and unpacking floating-point numbers}{33}}
+\@writefile{toc}{\contentsline {subsubsection}{Shading Outlines}{34}}
+\citation{Lottes:2009}
+\@writefile{lof}{\contentsline {figure}{\numberline {3.11}{\ignorespaces Pixel art of `Whimsicott' from \textit  {Pok\'{e}mon Black 2/White 2}. The leftmost image has all outlines shaded with the same colour, while the central image utilises various outline shading techniques. The rightmost image is a close-up showing anti-aliasing.}}{35}}
+\newlabel{fig:antialiasedoutline}{{3.11}{35}}
+\@writefile{lof}{\contentsline {figure}{\numberline {3.12}{\ignorespaces From left to right: single-colour outlines, colour based on the pixel underneath, outlines made darker than neighbouring pixels, and anti-aliased outlines.}}{36}}
+\newlabel{fig:outlines}{{3.12}{36}}
+\@writefile{toc}{\contentsline {section}{\numberline {3.6}Detail Preservation}{36}}
+\@writefile{toc}{\contentsline {chapter}{\numberline {4}Evaluation}{38}}
+\@writefile{lof}{\addvspace {10\p@ }}
+\@writefile{lot}{\addvspace {10\p@ }}
+\@writefile{lof}{\contentsline {figure}{\numberline {4.1}{\ignorespaces The `Stanford dragon'.}}{38}}
+\newlabel{fig:dragon}{{4.1}{38}}
+\@writefile{lof}{\contentsline {figure}{\numberline {4.2}{\ignorespaces The Stanford dragon rendered at 128$\times $128 pixels, with both Phong shading (left) and pixel art shading (right).}}{39}}
+\newlabel{fig:shadeddragon}{{4.2}{39}}
+\@writefile{lof}{\contentsline {figure}{\numberline {4.3}{\ignorespaces Frame rate while rendering a single reduced-polygon Stanford dragon on a NVIDIA GeForce GTX 765M GPU.}}{39}}
+\newlabel{fig:graph1}{{4.3}{39}}
+\@writefile{lof}{\contentsline {figure}{\numberline {4.4}{\ignorespaces Frame rate while rendering 8 copies of the reduced-polygon Stanford dragon on a NVIDIA GeForce GTX 765M GPU.}}{40}}
+\newlabel{fig:graph2}{{4.4}{40}}
+\@writefile{lof}{\contentsline {figure}{\numberline {4.5}{\ignorespaces Frame rate while rendering 8 copies of the reduced-polygon Stanford dragon on a NVIDIA GeForce GTX 560Ti GPU.}}{40}}
+\newlabel{fig:graph3}{{4.5}{40}}
+\@writefile{lof}{\contentsline {figure}{\numberline {4.6}{\ignorespaces Black outlines on the left compared with coloured outlines on the right.}}{41}}
+\newlabel{fig:outlinecomparison}{{4.6}{41}}
+\@writefile{lof}{\contentsline {figure}{\numberline {4.7}{\ignorespaces From left to right: Scolipede rendered with an automatically-selected palette, Scolipede rendered with the original pixel art's palette, and Scolipede's original art from \textit  {Pok\'{e}mon Black 2/White 2}.}}{42}}
+\newlabel{fig:scolipedecomparison}{{4.7}{42}}
+\@writefile{lof}{\contentsline {figure}{\numberline {4.8}{\ignorespaces A model of `Eevee' from \textit  {Pok\'{e}Park 2} rendered using the pixel art shader, and Eevee's original art from \textit  {Pok\'{e}mon Black 2/White 2}.}}{42}}
+\newlabel{fig:eeveecomparison}{{4.8}{42}}
+\@writefile{lof}{\contentsline {figure}{\numberline {4.9}{\ignorespaces Histograms comparing the normalised frequencies of each colour in the rendered image of Scolipede and the hand-drawn art.}}{43}}
+\newlabel{fig:scolipedehistogram}{{4.9}{43}}
+\@writefile{lof}{\contentsline {figure}{\numberline {4.10}{\ignorespaces Histograms comparing the normalised frequencies of each colour in the rendered image of Eevee and the hand-drawn art.}}{43}}
+\newlabel{fig:eeveehistogram}{{4.10}{43}}
+\@writefile{lof}{\contentsline {figure}{\numberline {4.11}{\ignorespaces Scolipede rendered with the outline on the outside of the model.}}{44}}
+\newlabel{fig:bulbous}{{4.11}{44}}
+\@writefile{lof}{\contentsline {figure}{\numberline {4.12}{\ignorespaces `Shiny Scolipede', an example of a palette swap in \textit  {Pok\'{e}mon Black 2/White 2}. Note how the shading on the left, rendered, sprite is different to that in Figure\nobreakspace  {}4.7\hbox {} while the shading on the right, hand-drawn, sprite is identical.}}{45}}
+\newlabel{fig:shinyscolipede}{{4.12}{45}}
+\citation{Williams:1978:CCS:965139.807402}
+\bibdata{references}
+\@writefile{toc}{\contentsline {chapter}{\numberline {5}Conclusion}{46}}
+\@writefile{lof}{\addvspace {10\p@ }}
+\@writefile{lot}{\addvspace {10\p@ }}
+\bibcite{Arthur:clusterfck}{1}
+\bibcite{Canny:1986:CAE:11274.11275}{2}
+\bibcite{CIE:2001:142-2001}{3}
+\bibcite{Decaudin:1996:CLR}{4}
+\bibcite{Engelbart:1968:RCA:1476589.1476645}{5}
+\bibcite{Floyd:1976:AAS}{6}
+\bibcite{Gerstner:2012:PIA}{7}
+\bibcite{Heckbert:1982:CIQ:965145.801294}{8}
+\bibcite{Inglis:2012:PVL:2330147.2330153}{9}
+\bibcite{Lottes:2009}{10}
+\bibcite{macqueen1967}{11}
+\bibcite{COTE:COTE376}{12}
+\bibcite{Phong:1975:ICG:360825.360839}{13}
+\bibcite{Sobel1968}{14}
+\bibcite{W3Schools:BrowserShare}{15}
+\bibcite{Williams:1978:CCS:965139.807402}{16}
+\bibstyle{plain}
+\@writefile{toc}{\contentsline {chapter}{\numberline {A}OpenGL ES Example}{49}}
+\@writefile{lof}{\addvspace {10\p@ }}
+\@writefile{lot}{\addvspace {10\p@ }}
+\newlabel{app:gles}{{A}{49}}
+\@writefile{lol}{\contentsline {lstlisting}{\numberline {A.1}Building a texture containing the model outline}{49}}
+\@writefile{toc}{\contentsline {chapter}{\numberline {B}CIEDE2000 Colour Difference}{51}}
+\@writefile{lof}{\addvspace {10\p@ }}
+\@writefile{lot}{\addvspace {10\p@ }}
+\newlabel{app:ciede2000}{{B}{51}}
+\@writefile{toc}{\contentsline {chapter}{\numberline {C}Constructing the CIEDE2000 Cache}{53}}
+\@writefile{lof}{\addvspace {10\p@ }}
+\@writefile{lot}{\addvspace {10\p@ }}
+\newlabel{app:cache}{{C}{53}}
+\@writefile{toc}{\contentsline {chapter}{\numberline {D}Outline Colour Quantisation}{57}}
+\@writefile{lof}{\addvspace {10\p@ }}
+\@writefile{lot}{\addvspace {10\p@ }}
+\newlabel{app:outlines}{{D}{57}}
